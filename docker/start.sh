@@ -30,6 +30,15 @@ if [ -z "$APP_KEY" ]; then
     php artisan key:generate --force
 fi
 
+# ── SQLite: create the database file if using SQLite ─────────────────────────
+if [ "${DB_CONNECTION}" = "sqlite" ]; then
+    DB_FILE="${DB_DATABASE:-/var/www/html/database/database.sqlite}"
+    mkdir -p "$(dirname "$DB_FILE")"
+    touch "$DB_FILE"
+    chown www-data:www-data "$DB_FILE" 2>/dev/null || true
+    echo "==> SQLite database: $DB_FILE"
+fi
+
 # ── Run database migrations ──────────────────────────────────────────────────
 echo "==> Running database migrations..."
 php artisan migrate --force --no-interaction

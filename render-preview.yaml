@@ -1,0 +1,56 @@
+# render-preview.yaml — Zero-dependency preview deployment
+#
+# Uses SQLite (no external database needed).
+# Deploy this to see the full UI/design instantly on Render's free tier.
+#
+# HOW TO USE:
+#   Option A — Render Dashboard:
+#     New → Blueprint → select this repo → manually pick this file
+#     (Render defaults to render.yaml; you may need to rename this to render.yaml temporarily)
+#
+#   Option B — rename before pushing:
+#     Rename render.yaml → render-production.yaml
+#     Rename render-preview.yaml → render.yaml
+#     git add -A && git commit -m "switch to preview config" && git push
+#
+# Switch back to render.yaml for production (PostgreSQL + persistent disk).
+
+services:
+  - type: web
+    name: cloud-crm-preview
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free                  # completely free, no card needed for this
+    region: oregon
+    healthCheckPath: /
+
+    envVars:
+      - key: APP_NAME
+        value: "Cloud CRM"
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+
+      # SQLite — no external database needed at all
+      - key: DB_CONNECTION
+        value: sqlite
+      - key: DB_DATABASE
+        value: /var/www/html/database/database.sqlite
+
+      # File-based drivers — no Redis/database service needed
+      - key: SESSION_DRIVER
+        value: file
+      - key: CACHE_STORE
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+
+      - key: TELEMETRY_ENABLED
+        value: "false"
+
+      # Mail — set to log so missing credentials don't crash the app
+      - key: MAIL_MAILER
+        value: log

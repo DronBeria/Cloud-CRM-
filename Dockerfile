@@ -75,6 +75,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         pdo \
         pdo_pgsql \
         pdo_mysql \
+        pdo_sqlite \
         zip \
         gd \
         mbstring \
