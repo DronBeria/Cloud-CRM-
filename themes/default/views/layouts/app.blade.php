@@ -12,7 +12,7 @@
         @endisset
     </title>
     @livewireStyles
-    @vite(['themes/' . config('settings.theme') . '/js/app.js', 'themes/' . config('settings.theme') . '/css/app.css'], config('settings.theme'))
+    @vite(['themes/' . (config('settings.theme', 'default') ?: 'default') . '/js/app.js', 'themes/' . (config('settings.theme', 'default') ?: 'default') . '/css/app.css'], config('settings.theme', 'default') ?: 'default')
     @include('layouts.colors')
 
     @if (config('settings.favicon'))
