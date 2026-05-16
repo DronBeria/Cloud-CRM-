@@ -46,7 +46,7 @@ RUN composer install \
 COPY package.json package-lock.json* vite.config.js ./
 COPY resources/ resources/
 COPY themes/ themes/
-RUN npm ci --prefer-offline && npm run build && rm -rf node_modules
+RUN npm install --prefer-offline && npm run build && rm -rf node_modules
 
 # Copy remaining application code
 COPY . .
