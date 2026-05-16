@@ -19,9 +19,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Alignment;
-use Filament\Support\Facades\FilamentIcon;
-use Filament\Support\Icons\Heroicon;
-use Filament\View\PanelsIconAlias;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -67,7 +64,7 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-s-arrow-uturn-left'),
                 'logout' => Action::make('logout')
                     ->label('Sign out')
-                    ->icon(FilamentIcon::resolve(PanelsIconAlias::USER_MENU_LOGOUT_BUTTON) ?? Heroicon::ArrowLeftOnRectangle)
+                    ->icon('heroicon-o-arrow-left-on-rectangle')
                     ->url(fn () => $panel->getLogoutUrl())
                     ->postToUrl(),
             ])
