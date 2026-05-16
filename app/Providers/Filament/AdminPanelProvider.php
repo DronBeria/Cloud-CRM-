@@ -8,7 +8,6 @@ use App\Http\Middleware\ResolveUserSession;
 use App\Models\Extension;
 use App\Providers\SettingsProvider;
 use Exception;
-use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -62,11 +61,6 @@ class AdminPanelProvider extends PanelProvider
                     ->label('Exit Admin')
                     ->url('/')
                     ->icon('heroicon-s-arrow-uturn-left'),
-                'logout' => Action::make('logout')
-                    ->label('Sign out')
-                    ->icon('heroicon-o-arrow-left-on-rectangle')
-                    ->url(fn () => $panel->getLogoutUrl())
-                    ->postToUrl(),
             ])
             ->discoverWidgets(in: app_path('Admin/Widgets'), for: 'App\\Admin\\Widgets')
             ->renderHook(
