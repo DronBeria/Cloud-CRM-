@@ -61,6 +61,7 @@ RUN apk add --no-cache \
     nginx \
     supervisor \
     postgresql-dev \
+    sqlite-dev \
     libzip-dev \
     libpng-dev \
     libjpeg-turbo-dev \
