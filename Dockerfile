@@ -65,4 +65,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Use local prisma CLI (v5) to push schema, then start server
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js db push --schema=/app/prisma/schema.prisma --accept-data-loss && node server.js"]
+CMD ["sh", "-c", "[ -n \"$DATABASE_URL\" ] && node node_modules/prisma/build/index.js db push --schema=/app/prisma/schema.prisma --accept-data-loss || echo 'Skipping db push (no DATABASE_URL)'; node server.js"]
