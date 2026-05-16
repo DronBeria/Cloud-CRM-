@@ -1,23 +1,34 @@
-# Laravel
-/vendor/
+# Next.js
+/.next/
+/out/
+.next
+
+# Node
 /node_modules/
+npm-debug.log*
+yarn-error.log
+.pnpm-debug.log*
+
+# Environment
 /.env
-/.env.backup
+/.env.local
+/.env.*.local
 /.env.production
-/storage/*.key
-/storage/app/public
+/.env.backup
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Build outputs
 /public/build
 /public/hot
-Homestead.json
-Homestead.yaml
-auth.json
-npm-debug.log
-yarn-error.log
 
-# Bootstrap cache
+# PHP/Laravel (kept for reference)
+/vendor/
 /bootstrap/cache/*.php
 
-# Storage (logs, sessions, uploads — generated at runtime)
+# Storage (runtime)
 /storage/logs/*
 /storage/framework/cache/*
 /storage/framework/sessions/*
@@ -27,7 +38,7 @@ yarn-error.log
 !/storage/framework/sessions/.gitignore
 !/storage/framework/views/.gitignore
 
-# OS files
+# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -44,3 +55,8 @@ desktop.ini
 *.swo
 .phpunit.cache
 .phpunit.result.cache
+
+# Misc
+*.log
+.turbo
+tsconfig.tsbuildinfo

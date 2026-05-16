@@ -1,0 +1,459 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  permissions Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+}
+
+model User {
+  id                     String    @id @default(cuid())
+  name                   String
+  email                  String    @unique
+  password               String?
+  emailVerifiedAt        DateTime?
+  twoFactorSecret        String?
+  twoFactorRecoveryCodes String?
+  roleId                 String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  role                  Role?                  @relation(fields: [roleId], references: [id])
+  accounts              Account[]
+  sessions              Session[]
+  orders                Order[]
+  services              Service[]
+  invoices              Invoice[]
+  tickets               Ticket[]
+  ticketMessages        TicketMessage[]
+  notifications         Notification[]
+  credits               Credit[]
+  cart                  Cart?
+  apiKeys               ApiKey[]
+  userSessions          UserSession[]
+  invoiceTransactions   InvoiceTransaction[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Setting {
+  id              String   @id @default(cuid())
+  key             String
+  value           String?
+  type            String   @default("text")
+  encrypted       Boolean  @default(false)
+  settingableType String?
+  settingableId   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([key, settingableType, settingableId])
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  parentId  String?
+  name      String
+  slug      String     @unique
+  sort      Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  parent   Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryChildren")
+  products Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  categoryId  String?
+  name        String
+  slug        String   @unique
+  description String?
+  hidden      Boolean  @default(false)
+  sort        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category      Category?      @relation(fields: [categoryId], references: [id])
+  plans         Plan[]
+  configOptions ConfigOption[]
+  services      Service[]
+}
+
+model Currency {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  prefix       String   @default("")
+  suffix       String   @default("")
+  exchangeRate Decimal  @default(1.0)
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  prices    Price[]
+  orders    Order[]
+  services  Service[]
+  invoices  Invoice[]
+  credits   Credit[]
+  carts     Cart[]
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  productId     String
+  name          String
+  billingPeriod Int      @default(1)
+  billingUnit   String   @default("month")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  prices    Price[]
+  services  Service[]
+  cartItems CartItem[]
+}
+
+model Price {
+  id           String   @id @default(cuid())
+  planId       String
+  currencyCode String
+  price        Decimal
+  setupFee     Decimal  @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  plan     Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  currency Currency @relation(fields: [currencyCode], references: [code])
+
+  @@unique([planId, currencyCode])
+}
+
+model ConfigOption {
+  id          String   @id @default(cuid())
+  productId   String
+  type        String   @default("text")
+  envVariable String?
+  name        String
+  description String?
+  required    Boolean  @default(false)
+  hidden      Boolean  @default(false)
+  upgradable  Boolean  @default(false)
+  sort        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model TaxRate {
+  id        String   @id @default(cuid())
+  name      String
+  rate      Decimal
+  country   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Coupon {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  type            String    @default("percent")
+  value           Decimal
+  maxUses         Int?
+  maxUsesPerUser  Int?
+  used            Int       @default(0)
+  appliesTo       Json      @default("[]")
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  carts Cart[]
+}
+
+model Order {
+  id           String   @id @default(cuid())
+  userId       String
+  invoiceId    String?
+  currencyCode String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice  Invoice?  @relation(fields: [invoiceId], references: [id])
+  currency Currency  @relation(fields: [currencyCode], references: [code])
+  services Service[]
+}
+
+model Service {
+  id                 String    @id @default(cuid())
+  userId             String
+  orderId            String?
+  productId          String
+  planId             String?
+  currencyCode       String
+  status             String    @default("active")
+  expiresAt          DateTime?
+  label              String?
+  billingAgreementId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order    Order?   @relation(fields: [orderId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+  plan     Plan?    @relation(fields: [planId], references: [id])
+  currency Currency @relation(fields: [currencyCode], references: [code])
+}
+
+model Invoice {
+  id           String    @id @default(cuid())
+  number       Int       @unique @default(autoincrement())
+  userId       String
+  currencyCode String
+  status       String    @default("pending")
+  dueAt        DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency     Currency             @relation(fields: [currencyCode], references: [code])
+  items        InvoiceItem[]
+  transactions InvoiceTransaction[]
+  orders       Order[]
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  description String
+  price       Decimal
+  quantity    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model InvoiceTransaction {
+  id                  String   @id @default(cuid())
+  invoiceId           String
+  gatewayId           String?
+  userId              String?
+  amount              Decimal
+  status              String   @default("processing")
+  isCreditTransaction Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  gateway Gateway? @relation(fields: [gatewayId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+}
+
+model Ticket {
+  id        String   @id @default(cuid())
+  userId    String
+  subject   String
+  status    String   @default("open")
+  priority  String   @default("medium")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages TicketMessage[]
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  userId    String
+  message   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ticket      Ticket                     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments TicketMessageAttachment[]
+}
+
+model TicketMessageAttachment {
+  id              String   @id @default(cuid())
+  uuid            String   @unique @default(cuid())
+  ticketMessageId String
+  name            String
+  path            String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  ticketMessage TicketMessage @relation(fields: [ticketMessageId], references: [id], onDelete: Cascade)
+}
+
+model NotificationTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  subject     String
+  enabled     Boolean  @default(true)
+  body        String
+  cc          Json     @default("[]")
+  bcc         Json     @default("[]")
+  mailEnabled Boolean  @default(true)
+  inAppEnabled Boolean @default(true)
+  inAppTitle  String?
+  inAppBody   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  url       String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Credit {
+  id           String   @id @default(cuid())
+  userId       String
+  amount       Decimal
+  currencyCode String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency Currency @relation(fields: [currencyCode], references: [code])
+}
+
+model Cart {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  currencyCode String
+  couponId     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency Currency  @relation(fields: [currencyCode], references: [code])
+  coupon   Coupon?   @relation(fields: [couponId], references: [id])
+  items    CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  planId    String
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+}
+
+model Gateway {
+  id          String   @id @default(cuid())
+  extensionId String?
+  name        String
+  enabled     Boolean  @default(false)
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  extension    Extension?           @relation(fields: [extensionId], references: [id])
+  transactions InvoiceTransaction[]
+}
+
+model Extension {
+  id        String   @id @default(cuid())
+  path      String
+  namespace String
+  name      String
+  enabled   Boolean  @default(false)
+  type      String   @default("gateway")
+  version   String   @default("1.0.0")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  gateways Gateway[]
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  key        String    @unique
+  name       String
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserSession {
+  id           String    @id @default(cuid())
+  userId       String
+  token        String    @unique
+  ipAddress    String?
+  userAgent    String?
+  lastActiveAt DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

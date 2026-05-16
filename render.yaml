@@ -1,4 +1,4 @@
-# render.yaml — Cloud CRM on Render
+# render.yaml — CloudCRM Next.js on Render
 # Docs: https://render.com/docs/infrastructure-as-code
 
 services:
@@ -7,122 +7,74 @@ services:
     name: cloud-crm
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter               # change to 'standard' or higher for production
-    region: singapore           # closest to India; also try oregon/frankfurt
+    plan: starter
+    region: singapore
     healthCheckPath: /
 
     envVars:
-      # Application
-      - key: APP_NAME
-        value: "Cloud CRM"
-      - key: APP_ENV
-        value: production
-      - key: APP_DEBUG
-        value: "false"
-      - key: APP_KEY
-        generateValue: true     # Render auto-generates a secure key
-      - key: APP_URL
-        value: https://cloud-crm.onrender.com   # update after first deploy
+      # Next.js App
+      - key: NEXT_PUBLIC_APP_NAME
+        value: "CloudCRM"
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://cloud-crm-9p5w.onrender.com
+      - key: AUTH_URL
+        value: https://cloud-crm-9p5w.onrender.com
+
+      # Auth.js secrets — set in Render Dashboard
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: AUTH_DISCORD_ID
+        sync: false
+      - key: AUTH_DISCORD_SECRET
+        sync: false
 
       # Database — auto-populated from the database defined below
-      - key: DB_CONNECTION
-        value: pgsql
       - key: DATABASE_URL
         fromDatabase:
           name: cloud-crm-db
           property: connectionString
 
-      # Parse DATABASE_URL into individual components (used by config/database.php)
-      - key: DB_HOST
-        fromDatabase:
-          name: cloud-crm-db
-          property: host
-      - key: DB_PORT
-        fromDatabase:
-          name: cloud-crm-db
-          property: port
-      - key: DB_DATABASE
-        fromDatabase:
-          name: cloud-crm-db
-          property: database
-      - key: DB_USERNAME
-        fromDatabase:
-          name: cloud-crm-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: cloud-crm-db
-          property: password
-
-      # Drivers — database is simplest for single-instance Render free tier
-      - key: SESSION_DRIVER
-        value: database
-      - key: CACHE_STORE
-        value: database
-      - key: QUEUE_CONNECTION
-        value: database
-
-      # Telemetry off by default
-      - key: TELEMETRY_ENABLED
+      # SMTP — set in Render Dashboard
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
         value: "false"
-
-      # ── Set these manually in Render Dashboard → Environment ──────────────
-      # Mail
-      - key: MAIL_MAILER
+      - key: SMTP_USER
         sync: false
-      - key: MAIL_HOST
+      - key: SMTP_PASS
         sync: false
-      - key: MAIL_PORT
-        sync: false
-      - key: MAIL_USERNAME
-        sync: false
-      - key: MAIL_PASSWORD
-        sync: false
-      - key: MAIL_FROM_ADDRESS
+      - key: SMTP_FROM
         sync: false
 
-      # Stripe
-      - key: STRIPE_KEY
-        sync: false
-      - key: STRIPE_SECRET
-        sync: false
-      - key: STRIPE_WEBHOOK_SECRET
+      # Encryption key for sensitive data
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+      # Cron job secret (also set in external cron service)
+      - key: CRON_SECRET
+        generateValue: true
+
+      # Optional: override default admin credentials
+      - key: ADMIN_EMAIL
+        value: "admin@cloudcrm.app"
+      - key: ADMIN_PASSWORD
         sync: false
 
-      # PayPal
-      - key: PAYPAL_CLIENT_ID
-        sync: false
-      - key: PAYPAL_CLIENT_SECRET
-        sync: false
+      # Node environment
+      - key: NODE_ENV
+        value: production
 
-      # Google Drive Backup extension
-      - key: GDRIVE_GOOGLE_CLIENT_ID
-        sync: false
-      - key: GDRIVE_GOOGLE_CLIENT_SECRET
-        sync: false
-
-    # Persistent disk for uploads / storage
-    disk:
-      name: cloud-crm-storage
-      mountPath: /var/www/html/storage
-      sizeGB: 10               # increase as needed
-
-  # ── Cron Job: daily billing & suspension ─────────────────────────────────────
-  # Disabled by default — the in-container scheduler handles this.
-  # Uncomment if you want a separate Render cron service instead.
-  #
-  # - type: cron
-  #   name: cloud-crm-cron
-  #   runtime: docker
-  #   dockerfilePath: ./Dockerfile
-  #   plan: starter
-  #   schedule: "0 0 * * *"
-  #   startCommand: php artisan schedule:run --no-interaction
+  # ── Cron Job: billing cycles ─────────────────────────────────────────────────
+  # To enable: call POST https://cloud-crm-9p5w.onrender.com/api/cron/billing
+  # with header x-cron-secret matching CRON_SECRET env var.
+  # Schedule via cron-job.org or similar external service.
 
 databases:
   # ── PostgreSQL database ───────────────────────────────────────────────────────
   - name: cloud-crm-db
-    plan: free                 # upgrade to 'starter' for production (free tier has limits)
+    plan: free
     databaseName: cloudcrm
     user: cloudcrm
     region: singapore
