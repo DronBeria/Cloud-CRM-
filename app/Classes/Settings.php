@@ -11,11 +11,11 @@ use App\Models\User;
 use App\Rules\Cidr;
 use DateTimeZone;
 use Exception;
-use Filament\Schemas\Components\Utilities\Get;
+use Filament\Forms\Get;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 use Minishlink\WebPush\VAPID;
-use Ramsey\Uuid\Uuid;
 
 class Settings
 {
@@ -693,7 +693,7 @@ class Settings
             $uuid = null;
         }
         if (is_null($uuid)) {
-            $uuid = Uuid::uuid4()->toString();
+            $uuid = (string) Str::uuid();
             try {
                 Setting::updateOrCreate(
                     ['key' => 'telemetry_uuid'],

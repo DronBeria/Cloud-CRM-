@@ -1,0 +1,15 @@
+<?php
+
+namespace App\Events\InvoiceTransaction;
+
+use App\Models\InvoiceTransaction;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+class Updated
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
+    public function __construct(public InvoiceTransaction $invoiceTransaction) {}
+}

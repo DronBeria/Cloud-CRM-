@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 class SettingsProvider extends ServiceProvider
@@ -61,6 +62,13 @@ class SettingsProvider extends ServiceProvider
             URL::forceRootUrl(config('app.url'));
 
             Config::set('filesystems.disks.public.url', config('app.url') . '/storage');
+
+            // Register the active theme's views directory
+            $activeTheme = config('settings.theme', 'default');
+            $themeViewPath = base_path("themes/{$activeTheme}/views");
+            if ($activeTheme !== 'default' && is_dir($themeViewPath)) {
+                View::addLocation($themeViewPath);
+            }
         } catch (\Throwable $e) {
             // Do nothing
         }
