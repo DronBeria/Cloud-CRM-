@@ -43,7 +43,7 @@ RUN composer install \
     --ignore-platform-reqs
 
 # Copy and build frontend assets
-COPY package.json package-lock.json* vite.config.js ./
+COPY package.json package-lock.json* ./
 COPY resources/ resources/
 COPY themes/ themes/
 RUN npm install --prefer-offline && npm run build && rm -rf node_modules
