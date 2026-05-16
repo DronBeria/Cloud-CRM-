@@ -51,10 +51,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma schema and generated client
+# Copy Prisma schema, generated client, and CLI (so npx doesn't re-download)
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
 USER nextjs
 
@@ -63,5 +64,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Run migrations then start server
-CMD ["sh", "-c", "npx prisma db push --schema=/app/prisma/schema.prisma --accept-data-loss && node server.js"]
+# Use local prisma CLI (v5) to push schema, then start server
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js db push --schema=/app/prisma/schema.prisma --accept-data-loss && node server.js"]
