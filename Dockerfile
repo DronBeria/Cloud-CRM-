@@ -9,6 +9,7 @@ RUN apk add --no-cache \
     freetype-dev \
     icu-dev \
     oniguruma-dev \
+    openssl \
     curl \
     git \
     unzip \
@@ -69,6 +70,7 @@ RUN apk add --no-cache \
     icu-dev \
     oniguruma-dev \
     gettext \
+    openssl \
     curl
 
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \

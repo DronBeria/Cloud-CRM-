@@ -11,8 +11,6 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
-use Qirolab\Theme\Theme;
-
 class SettingsProvider extends ServiceProvider
 {
     /**
@@ -57,15 +55,13 @@ class SettingsProvider extends ServiceProvider
 
             date_default_timezone_set(config('settings.timezone', 'UTC'));
 
-            Theme::set(config('settings.theme', 'default'), 'default');
-
             if (Str::startsWith(config('app.url') ?? '', 'https://')) {
                 URL::forceScheme('https');
             }
             URL::forceRootUrl(config('app.url'));
 
             Config::set('filesystems.disks.public.url', config('app.url') . '/storage');
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             // Do nothing
         }
     }
