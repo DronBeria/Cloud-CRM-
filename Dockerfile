@@ -9,6 +9,7 @@ RUN apk add --no-cache \
     freetype-dev \
     icu-dev \
     oniguruma-dev \
+    gmp-dev \
     openssl \
     curl \
     git \
@@ -28,7 +29,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         pcntl \
         bcmath \
         intl \
-        opcache
+        opcache \
+        gmp
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -69,6 +71,7 @@ RUN apk add --no-cache \
     freetype-dev \
     icu-dev \
     oniguruma-dev \
+    gmp-dev \
     gettext \
     openssl \
     curl
@@ -86,7 +89,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         pcntl \
         bcmath \
         intl \
-        opcache
+        opcache \
+        gmp
 
 # PHP opcache tuning for production
 RUN { \

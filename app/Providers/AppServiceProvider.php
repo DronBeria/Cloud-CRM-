@@ -137,7 +137,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Change livewire url
         Livewire::setUpdateRoute(function ($handle) {
-            return Route::post('/paymenter/update', $handle)->middleware('web')->name('paymenter.');
+            return Route::post('/paymenter/update', $handle)->middleware('web')->name('paymenter.livewire.update');
         });
         Livewire::propertySynthesizer(PriceSynth::class);
 
