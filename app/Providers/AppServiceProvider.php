@@ -196,7 +196,7 @@ class AppServiceProvider extends ServiceProvider
         Passport::authorizationView('vendor.passport.authorize');
         Passport::$validateKeyPermissions = false;
 
-        if (class_exists(Scramble::class)) {
+        if (class_exists(Scramble::class) && method_exists(Scramble::class, 'configure')) {
             Scramble::configure()
                 ->routes(function (\Illuminate\Routing\Route $route) {
                     return Str::startsWith($route->uri, 'api/v1/admin');
