@@ -46,7 +46,7 @@ export async function POST(
 
     const userRole = await db.role.findFirst({ where: { name: "user" } });
     const tempPassword = body.password ?? generatePassword();
-    const hashed = await bcrypt.hash(tempPassword, 12);
+    const hashed = await bcrypt.hash(tempPassword, 10);
 
     const user = await db.user.create({
       data: {

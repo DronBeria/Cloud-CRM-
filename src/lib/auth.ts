@@ -10,7 +10,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60,
   },
   pages: {
     signIn: "/login",
@@ -31,12 +31,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!credentials?.email || !credentials?.password) return null;
 
         try {
+          // Minimal select — only fetch what we need
           const user = await db.user.findUnique({
             where: { email: credentials.email as string },
-            include: { role: true },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              password: true,
+              roleId: true,
+              role: { select: { name: true } },
+            },
           });
 
-          if (!user || !user.password) return null;
+          if (!user?.password) return null;
 
           const isValid = await bcrypt.compare(
             credentials.password as string,
@@ -60,7 +68,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // On sign in — attach role from user object
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? "user";
@@ -79,15 +86,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   events: {
     async createUser({ user }) {
+      // Assign default user role — fire-and-forget style
       try {
-        let role = await db.role.findFirst({ where: { name: "user" } });
-        if (!role) {
-          role = await db.role.create({ data: { name: "user", permissions: [] } });
-        }
-        await db.user.update({
-          where: { id: user.id },
-          data: { roleId: role.id },
+        const role = await db.role.findFirst({
+          where: { name: "user" },
+          select: { id: true },
         });
+        if (role && user.id) {
+          await db.user.update({
+            where: { id: user.id },
+            data: { roleId: role.id },
+            select: { id: true }, // minimal select
+          });
+        }
       } catch {
         // Non-fatal
       }

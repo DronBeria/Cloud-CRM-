@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Ensure user role exists
     let role = await db.role.findFirst({ where: { name: "user" } });

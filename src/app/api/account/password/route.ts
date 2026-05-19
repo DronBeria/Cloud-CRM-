@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const hashed = await bcrypt.hash(newPassword, 12);
+    const hashed = await bcrypt.hash(newPassword, 10);
     await db.user.update({
       where: { id: session.user.id },
       data: { password: hashed },

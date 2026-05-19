@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       const existing = await db.user.findUnique({ where: { email: clientEmail } });
       if (existing) continue;
 
-      const tempPassword = await bcrypt.hash("ChangeMe@123", 12);
+      const tempPassword = await bcrypt.hash("ChangeMe@123", 10);
 
       await db.user.create({
         data: {

@@ -3,15 +3,11 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { ClientNavbar } from "@/components/layout/ClientNavbar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
-export default function ClientLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -24,29 +20,30 @@ export default function ClientLayout({
 
   if (status === "loading" || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar onMenuClick={() => setSidebarOpen(true)} />
+    <div className="min-h-screen flex bg-gray-50/50">
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex shrink-0">
+        <Sidebar />
+      </div>
 
-      <div className="flex flex-1">
-        <div className="hidden md:flex">
-          <Sidebar />
-        </div>
+      {/* Mobile sidebar */}
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="p-0 w-56">
+          <Sidebar onClose={() => setSidebarOpen(false)} />
+        </SheetContent>
+      </Sheet>
 
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="p-0 w-64">
-            <Sidebar onClose={() => setSidebarOpen(false)} />
-          </SheetContent>
-        </Sheet>
-
-        <main className="flex-1 overflow-auto">
-          <div className="container max-w-6xl mx-auto p-6">{children}</div>
+      <div className="flex-1 flex flex-col min-w-0">
+        <ClientNavbar onMenuClick={() => setSidebarOpen(true)} />
+        <main className="flex-1 p-5 lg:p-6 max-w-5xl w-full mx-auto">
+          {children}
         </main>
       </div>
     </div>
