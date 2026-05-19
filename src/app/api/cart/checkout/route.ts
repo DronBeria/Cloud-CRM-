@@ -44,6 +44,15 @@ export async function POST(req: NextRequest) {
     if (cart.coupon.expiresAt && new Date(cart.coupon.expiresAt) < new Date()) {
       return NextResponse.json({ error: "Coupon has expired" }, { status: 400 });
     }
+    // Validate coupon applies to these products
+    const appliesTo = cart.coupon.appliesTo as string[];
+    if (Array.isArray(appliesTo) && appliesTo.length > 0) {
+      const productIds = cart.items.map((i) => i.plan.productId);
+      const allApply = productIds.every((id) => appliesTo.includes(id));
+      if (!allApply) {
+        return NextResponse.json({ error: "Coupon is not valid for all items in your cart" }, { status: 400 });
+      }
+    }
   }
 
   // Calculate line items with prices

@@ -21,6 +21,8 @@ export async function sendMail(opts: {
   html: string;
   cc?: string[];
   bcc?: string[];
+  userId?: string;
+  templateKey?: string;
 }) {
   try {
     const transporter = await getTransporter();
@@ -35,8 +37,21 @@ export async function sendMail(opts: {
       subject: opts.subject,
       html: opts.html,
     });
+
+    // Log successful send
+    const { db } = await import("@/lib/db");
+    await db.emailLog.create({
+      data: { to: opts.to, subject: opts.subject, status: "sent", userId: opts.userId, templateKey: opts.templateKey },
+    }).catch(() => {});
   } catch (err) {
     console.error("[Mailer] Failed to send email:", err);
+    // Log failure
+    try {
+      const { db } = await import("@/lib/db");
+      await db.emailLog.create({
+        data: { to: opts.to, subject: opts.subject, status: "failed", error: String(err), userId: opts.userId, templateKey: opts.templateKey },
+      });
+    } catch { /* silent */ }
   }
 }
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MoreHorizontal, Edit, Trash2, Mail, Shield, Loader2 } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, Mail, UserCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -71,6 +71,18 @@ export function ClientActions({ clientId, clientName, clientRole }: Props) {
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem onClick={() => setEditOpen(true)}>
             <Edit className="mr-2 h-4 w-4" />Edit Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={async () => {
+            const res = await fetch("/api/admin/impersonate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId: clientId }),
+            });
+            if (res.ok) {
+              window.open(`/dashboard?impersonating=${clientId}`, "_blank");
+            }
+          }}>
+            <UserCheck className="mr-2 h-4 w-4 text-violet-500" />View as Client
           </DropdownMenuItem>
           <DropdownMenuItem>
             <Mail className="mr-2 h-4 w-4" />Send Email

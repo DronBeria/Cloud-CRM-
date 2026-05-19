@@ -86,22 +86,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   events: {
     async createUser({ user }) {
-      // Assign default user role — fire-and-forget style
       try {
-        const role = await db.role.findFirst({
-          where: { name: "user" },
+        const role = await db.role.findFirst({ where: { name: "user" }, select: { id: true } });
+        if (role && user.id) {
+          await db.user.update({ where: { id: user.id }, data: { roleId: role.id }, select: { id: true } });
+        }
+      } catch { /* Non-fatal */ }
+    },
+    async signIn({ user, account }) {
+      if (!user?.id) return;
+      try {
+        // Record login session — keep last 20 per user
+        await db.userSession.create({
+          data: {
+            userId: user.id,
+            token: `login_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            lastActiveAt: new Date(),
+          },
+        });
+        // Clean up old sessions (keep 20)
+        const sessions = await db.userSession.findMany({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+          skip: 20,
           select: { id: true },
         });
-        if (role && user.id) {
-          await db.user.update({
-            where: { id: user.id },
-            data: { roleId: role.id },
-            select: { id: true }, // minimal select
-          });
+        if (sessions.length > 0) {
+          await db.userSession.deleteMany({ where: { id: { in: sessions.map((s) => s.id) } } });
         }
-      } catch {
-        // Non-fatal
-      }
+      } catch { /* Non-fatal */ }
     },
   },
 });

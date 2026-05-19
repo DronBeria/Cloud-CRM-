@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { sendNotification } from "@/lib/notifications";
+import { rateLimit, getRateLimitKey } from "@/lib/ratelimit";
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -11,6 +12,12 @@ const registerSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown";
+  const rl = await rateLimit(getRateLimitKey(ip, "register"), { limit: 5, windowMs: 60_000 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests. Try again in a minute." }, { status: 429 });
+  }
+
   try {
     const body = await req.json();
     const { name, email, password } = registerSchema.parse(body);

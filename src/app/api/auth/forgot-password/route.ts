@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { sendMail, renderTemplate } from "@/lib/mailer";
+import { sendMail } from "@/lib/mailer";
 import { z } from "zod";
 import crypto from "crypto";
+import { rateLimit, getRateLimitKey } from "@/lib/ratelimit";
 
 const schema = z.object({ email: z.string().email() });
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+  const rl = await rateLimit(getRateLimitKey(ip, "forgot-password"), { limit: 3, windowMs: 300_000 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests. Try again in 5 minutes." }, { status: 429 });
+  }
+
   try {
     const { email } = schema.parse(await req.json());
     const user = await db.user.findUnique({ where: { email } });

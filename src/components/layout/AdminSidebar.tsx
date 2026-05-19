@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, FileText, Server, MessageSquare,
   Package, Settings, Puzzle, CreditCard, Bell, Shield,
-  ChevronLeft, Zap, Activity, Link2, LogOut,
+  ChevronLeft, Zap, Activity, Link2, LogOut, Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "next-auth/react";
@@ -49,6 +49,7 @@ const SYSTEM_ITEMS: NavItem[] = [
   { href: "/admin/gateways", icon: CreditCard, label: "Gateways" },
   { href: "/admin/extensions", icon: Puzzle, label: "Extensions" },
   { href: "/admin/audit", icon: Activity, label: "Audit Log" },
+  { href: "/admin/email-logs", icon: Mail, label: "Email Logs" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 
