@@ -23,17 +23,15 @@ export async function register() {
         update: {},
       });
 
-      // Ensure default currency
+      // Ensure currencies
       await db.currency.upsert({
         where: { code: "USD" },
-        create: {
-          code: "USD",
-          name: "US Dollar",
-          prefix: "$",
-          suffix: "",
-          exchangeRate: 1,
-          enabled: true,
-        },
+        create: { code: "USD", name: "US Dollar", prefix: "$", suffix: "", exchangeRate: 1, enabled: true },
+        update: {},
+      });
+      await db.currency.upsert({
+        where: { code: "INR" },
+        create: { code: "INR", name: "Indian Rupee", prefix: "₹", suffix: "", exchangeRate: 83.5, enabled: true },
         update: {},
       });
 
@@ -52,6 +50,8 @@ export async function register() {
         credits_auto_apply: "false",
         mail_enabled: "false",
         registration_enabled: "true",
+        default_currency: "INR",
+        inr_exchange_rate: "83.5",
       };
 
       for (const [key, value] of Object.entries(defaultSettings)) {

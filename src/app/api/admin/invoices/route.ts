@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") ?? "";
   const page = parseInt(searchParams.get("page") ?? "1");
-  const pageSize = 20;
+  const pageSize = parseInt(searchParams.get("pageSize") ?? "20");
 
   const where = status ? { status } : {};
 
