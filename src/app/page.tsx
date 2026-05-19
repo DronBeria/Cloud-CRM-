@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  let categories: Awaited<ReturnType<typeof db.category.findMany>> = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let categories: any[] = [];
   try {
     categories = await db.category.findMany({
       where: { parentId: null },

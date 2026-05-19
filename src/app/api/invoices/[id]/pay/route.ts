@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { processInvoicePaid, applyCredits } from "@/lib/billing";
 
 export async function POST(
   req: NextRequest,
@@ -22,10 +23,7 @@ export async function POST(
   }
 
   if (invoice.status !== "pending") {
-    return NextResponse.json(
-      { error: "Invoice is not pending" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invoice is not pending" }, { status: 400 });
   }
 
   const total = invoice.items.reduce(
@@ -33,59 +31,53 @@ export async function POST(
     0
   );
 
-  // Check user credits
-  const credits = await db.credit.findMany({
-    where: { userId: session.user.id, currencyCode: invoice.currencyCode },
+  // Apply credits in a transaction
+  const remaining = await db.$transaction(async (tx) => {
+    return applyCredits(
+      tx,
+      invoice.id,
+      session.user?.id ?? "",
+      invoice.currencyCode,
+      total
+    );
   });
 
-  const totalCredits = credits.reduce((s, c) => s + Number(c.amount), 0);
-
-  if (totalCredits >= total) {
-    // Pay with credits
-    await db.$transaction([
-      db.credit.deleteMany({
-        where: { userId: session.user.id, currencyCode: invoice.currencyCode },
-      }),
-      db.invoiceTransaction.create({
-        data: {
-          invoiceId: id,
-          userId: session.user.id,
-          amount: total,
-          status: "succeeded",
-          isCreditTransaction: true,
-        },
-      }),
-      db.invoice.update({
-        where: { id },
-        data: { status: "paid" },
-      }),
-    ]);
-
-    // Add back excess credits
-    if (totalCredits > total) {
-      await db.credit.create({
-        data: {
-          userId: session.user.id,
-          currencyCode: invoice.currencyCode,
-          amount: totalCredits - total,
-        },
-      });
-    }
-
+  if (remaining <= 0) {
+    // Fully paid with credits — mark invoice as paid
+    await db.invoice.update({
+      where: { id },
+      data: { status: "paid" },
+    });
+    await processInvoicePaid(id);
     return NextResponse.json({ success: true, method: "credits" });
   }
 
-  // For external payment, return payment gateway URL (simplified)
+  // Partial credit applied — check if any enabled gateway exists
+  const gateway = await db.gateway.findFirst({ where: { enabled: true } });
+  if (!gateway) {
+    return NextResponse.json({
+      success: false,
+      requiresPayment: true,
+      amount: remaining,
+      currency: invoice.currencyCode,
+      creditsApplied: total - remaining,
+      message: "No payment gateway configured. Please contact support.",
+    });
+  }
+
+  // Return redirect to payment
   return NextResponse.json({
     success: false,
     requiresPayment: true,
-    amount: total,
+    amount: remaining,
     currency: invoice.currencyCode,
-    message: "No payment gateway configured. Please contact support.",
+    creditsApplied: total - remaining,
+    gatewayId: gateway.id,
+    gatewayName: gateway.name,
+    paymentUrl: `/invoices/${id}/payment`,
   });
 }
 
-// GET for redirect to pay page
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

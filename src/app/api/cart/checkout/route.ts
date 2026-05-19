@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getFormattedInvoiceNumber } from "@/lib/billing";
+import { getBillingSettings } from "@/lib/settings";
+import { sendNotification } from "@/lib/notifications";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -31,14 +34,37 @@ export async function POST(req: NextRequest) {
   }
 
   const currencyCode = cart.currencyCode;
+  const billing = await getBillingSettings();
 
-  // Calculate total
-  let subtotal = cart.items.reduce((sum, item) => {
-    const price = item.plan.prices.find(
-      (p) => p.currencyCode === currencyCode
-    ) ?? item.plan.prices[0];
-    return sum + (price ? Number(price.price) + Number(price.setupFee) : 0);
-  }, 0);
+  // Validate coupon if applied
+  if (cart.coupon) {
+    if (cart.coupon.maxUses && cart.coupon.used >= cart.coupon.maxUses) {
+      return NextResponse.json({ error: "Coupon has reached its usage limit" }, { status: 400 });
+    }
+    if (cart.coupon.expiresAt && new Date(cart.coupon.expiresAt) < new Date()) {
+      return NextResponse.json({ error: "Coupon has expired" }, { status: 400 });
+    }
+  }
+
+  // Calculate line items with prices
+  const lineItems = cart.items.map((item) => {
+    const price =
+      item.plan.prices.find((p) => p.currencyCode === currencyCode) ??
+      item.plan.prices[0];
+    return {
+      description: `${item.plan.product.name} — ${item.plan.name}`,
+      price: price ? Number(price.price) : 0,
+      setupFee: price ? Number(price.setupFee) : 0,
+      quantity: 1,
+      plan: item.plan,
+      config: item.config,
+    };
+  });
+
+  let subtotal = lineItems.reduce(
+    (sum, i) => sum + i.price + i.setupFee,
+    0
+  );
 
   if (cart.coupon) {
     if (cart.coupon.type === "percent") {
@@ -46,9 +72,13 @@ export async function POST(req: NextRequest) {
     } else {
       subtotal = Math.max(0, subtotal - Number(cart.coupon.value));
     }
+    subtotal = Math.round(subtotal * 100) / 100;
   }
 
-  // Create invoice and order in a transaction
+  const dueAt = new Date(
+    Date.now() + billing.invoiceDueDays * 24 * 60 * 60 * 1000
+  );
+
   const result = await db.$transaction(async (tx) => {
     // Create invoice
     const invoice = await tx.invoice.create({
@@ -56,20 +86,22 @@ export async function POST(req: NextRequest) {
         userId,
         currencyCode,
         status: "pending",
-        dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        dueAt,
         items: {
-          create: cart.items.map((item) => {
-            const price = item.plan.prices.find(
-              (p) => p.currencyCode === currencyCode
-            ) ?? item.plan.prices[0];
-            return {
-              description: `${item.plan.product.name} — ${item.plan.name}`,
-              price: price ? Number(price.price) : 0,
-              quantity: 1,
-            };
-          }),
+          create: lineItems.map((item) => ({
+            description: item.description,
+            price: item.price + item.setupFee,
+            quantity: item.quantity,
+          })),
         },
       },
+    });
+
+    // Assign formatted invoice number
+    const invoiceNumber = await getFormattedInvoiceNumber(invoice.number);
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: { invoiceNumber },
     });
 
     // Create order
@@ -78,30 +110,47 @@ export async function POST(req: NextRequest) {
         userId,
         invoiceId: invoice.id,
         currencyCode,
+        status: "pending",
       },
     });
 
-    // Create services for each cart item
-    for (const item of cart.items) {
-      const expiresAt = new Date();
-      if (item.plan.billingUnit === "month") {
-        expiresAt.setMonth(expiresAt.getMonth() + item.plan.billingPeriod);
-      } else if (item.plan.billingUnit === "year") {
-        expiresAt.setFullYear(expiresAt.getFullYear() + item.plan.billingPeriod);
-      } else {
-        expiresAt.setDate(expiresAt.getDate() + item.plan.billingPeriod);
-      }
+    // Create services as PENDING (activated on payment)
+    for (const item of lineItems) {
+      const servicePrice =
+        item.plan.prices.find((p) => p.currencyCode === currencyCode)?.price ??
+        item.plan.prices[0]?.price ??
+        0;
 
-      await tx.service.create({
+      const service = await tx.service.create({
         data: {
           userId,
           orderId: order.id,
           productId: item.plan.productId,
           planId: item.plan.id,
           currencyCode,
-          status: "active",
-          expiresAt,
+          status: "pending",
+          price: servicePrice,
+          expiresAt: null, // set on activation
         },
+      });
+
+      // Save config options
+      if (item.config && typeof item.config === "object") {
+        for (const [configOptionId, value] of Object.entries(
+          item.config as Record<string, string>
+        )) {
+          if (value) {
+            await tx.serviceConfig.create({
+              data: { serviceId: service.id, configOptionId, value },
+            });
+          }
+        }
+      }
+
+      // Update invoice item to reference service
+      await tx.invoiceItem.updateMany({
+        where: { invoiceId: invoice.id, description: item.description },
+        data: { serviceId: service.id },
       });
     }
 
@@ -115,13 +164,18 @@ export async function POST(req: NextRequest) {
 
     // Clear cart
     await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-    await tx.cart.update({
-      where: { id: cart.id },
-      data: { couponId: null },
-    });
+    await tx.cart.update({ where: { id: cart.id }, data: { couponId: null } });
 
-    return { invoiceId: invoice.id, orderId: order.id };
+    return { invoiceId: invoice.id, orderId: order.id, invoiceNumber };
   });
+
+  // Send invoice created notification (non-blocking)
+  sendNotification("invoice_created", userId, {
+    invoiceNumber: result.invoiceNumber,
+    amount: subtotal.toFixed(2),
+    currency: currencyCode,
+    invoiceUrl: `/invoices/${result.invoiceId}`,
+  }).catch(console.error);
 
   return NextResponse.json(result, { status: 201 });
 }
