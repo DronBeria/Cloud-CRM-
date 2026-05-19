@@ -16,6 +16,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
 
+export const revalidate = 30;
+
 export const metadata: Metadata = { title: "Services — Admin" };
 
 export default async function AdminServicesPage() {

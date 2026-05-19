@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientsTabSwitcher } from "@/components/admin/ClientsTabSwitcher";
 
+export const revalidate = 30;
+
 export const metadata: Metadata = { title: "Clients — Admin" };
 
 const LEAD_SOURCE_LABELS: Record<string, string> = {

@@ -49,7 +49,7 @@ export default function AdminLayout({
           </SheetContent>
         </Sheet>
 
-        <main className="flex-1 overflow-auto bg-muted/20">
+        <main className="flex-1 overflow-auto bg-[#F8F9FB]">
           <div className="container max-w-7xl mx-auto p-6">{children}</div>
         </main>
       </div>

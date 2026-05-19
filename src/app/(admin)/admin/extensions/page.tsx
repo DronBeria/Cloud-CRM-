@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+export const revalidate = 30;
+
 export const metadata: Metadata = { title: "Extensions — Admin" };
 
 export default async function AdminExtensionsPage() {
