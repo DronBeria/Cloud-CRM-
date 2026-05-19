@@ -7,8 +7,10 @@ import { db } from "@/lib/db";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
+  trustHost: true,
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
     signIn: "/login",
@@ -26,82 +28,69 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        try {
+          const user = await db.user.findUnique({
+            where: { email: credentials.email as string },
+            include: { role: true },
+          });
+
+          if (!user || !user.password) return null;
+
+          const isValid = await bcrypt.compare(
+            credentials.password as string,
+            user.password
+          );
+
+          if (!isValid) return null;
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role?.name ?? "user",
+            roleId: user.roleId ?? undefined,
+          };
+        } catch {
           return null;
         }
-
-        const user = await db.user.findUnique({
-          where: { email: credentials.email as string },
-          include: { role: true },
-        });
-
-        if (!user || !user.password) {
-          return null;
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        );
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role?.name ?? "user",
-          roleId: user.roleId ?? undefined,
-        };
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // On sign in — attach role from user object
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? "user";
         token.roleId = (user as { roleId?: string }).roleId;
       }
-
-      // Refresh role on subsequent requests
-      if (token.id && !token.role) {
-        const dbUser = await db.user.findUnique({
-          where: { id: token.id as string },
-          include: { role: true },
-        });
-        if (dbUser) {
-          token.role = dbUser.role?.name ?? "user";
-          token.roleId = dbUser.roleId ?? undefined;
-        }
-      }
-
       return token;
     },
     async session({ session, token }) {
       if (token) {
         session.user.id = token.id as string;
-        (session.user as { role?: string }).role = token.role as string;
-        (session.user as { roleId?: string }).roleId = token.roleId as string;
+        (session.user as { role?: string }).role = (token.role as string) ?? "user";
+        (session.user as { roleId?: string }).roleId = token.roleId as string | undefined;
       }
       return session;
     },
   },
   events: {
     async createUser({ user }) {
-      // Ensure default role exists
-      let role = await db.role.findFirst({ where: { name: "user" } });
-      if (!role) {
-        role = await db.role.create({
-          data: { name: "user", permissions: [] },
+      try {
+        let role = await db.role.findFirst({ where: { name: "user" } });
+        if (!role) {
+          role = await db.role.create({ data: { name: "user", permissions: [] } });
+        }
+        await db.user.update({
+          where: { id: user.id },
+          data: { roleId: role.id },
         });
+      } catch {
+        // Non-fatal
       }
-      await db.user.update({
-        where: { id: user.id },
-        data: { roleId: role.id },
-      });
     },
   },
 });

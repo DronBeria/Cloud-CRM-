@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -46,7 +46,7 @@ function StaffLoginForm() {
       const role = session?.user?.role;
 
       if (role !== "admin" && role !== "manager") {
-        await fetch("/api/auth/signout", { method: "POST" });
+        await signOut({ redirect: false });
         toast.error("Access denied — staff accounts only.");
         return;
       }

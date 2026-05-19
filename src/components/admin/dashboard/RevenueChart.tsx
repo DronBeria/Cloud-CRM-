@@ -37,12 +37,15 @@ export function RevenueChart({ initialData = [], initialRange = "30d", totalReve
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (range === initialRange && initialData.length > 0) return;
+    if (range === initialRange && initialData.length > 0) {
+      setData(initialData);
+      return;
+    }
     setLoading(true);
     fetch(`/api/admin/dashboard?range=${range}`)
       .then((r) => r.json())
       .then((d) => setData(d.chartData ?? []))
-      .catch(console.error)
+      .catch(() => setData([]))
       .finally(() => setLoading(false));
   }, [range]);
 

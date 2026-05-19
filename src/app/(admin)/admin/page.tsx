@@ -44,9 +44,9 @@ export default async function AdminDashboardPage() {
   const startOfThisMonth = startOfMonth(now);
   const startOfLastMonth = startOfMonth(subMonths(now, 1));
 
-  const clientRole = await db.role.findFirst({ where: { name: "user" } });
+  const clientRole = await db.role.findFirst({ where: { name: "user" } }).catch(() => null);
 
-  // Parallel data fetch
+  // Parallel data fetch — wrapped so one failure doesn't kill the whole dashboard
   const [
     activeServices,
     revenue30d,
