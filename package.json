@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma db push --accept-data-loss && next build",
+    "build": "prisma generate && next build",
+    "build:migrate": "prisma generate && prisma db push --accept-data-loss && next build",
     "start": "next start",
     "analyze": "cross-env ANALYZE=true npm run build",
     "lint": "next lint",
