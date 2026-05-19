@@ -12,29 +12,34 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const categories = await db.category.findMany({
-    where: { parentId: null },
-    include: {
-      products: {
-        where: { hidden: false },
-        include: {
-          category: true,
-          plans: {
-            include: {
-              prices: {
-                include: { currency: true },
-                where: { currency: { enabled: true } },
-                take: 1,
+  let categories: Awaited<ReturnType<typeof db.category.findMany>> = [];
+  try {
+    categories = await db.category.findMany({
+      where: { parentId: null },
+      include: {
+        products: {
+          where: { hidden: false },
+          include: {
+            category: true,
+            plans: {
+              include: {
+                prices: {
+                  include: { currency: true },
+                  where: { currency: { enabled: true } },
+                  take: 1,
+                },
               },
+              orderBy: { createdAt: "asc" },
             },
-            orderBy: { createdAt: "asc" },
           },
+          orderBy: { sort: "asc" },
         },
-        orderBy: { sort: "asc" },
       },
-    },
-    orderBy: { sort: "asc" },
-  });
+      orderBy: { sort: "asc" },
+    });
+  } catch {
+    // DB unavailable — render empty state
+  }
 
   const features = [
     {
