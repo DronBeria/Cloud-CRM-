@@ -1,7 +1,7 @@
 {
-  "name": "cocloud-tsplus-agent",
+  "name": "CloudCRM-tsplus-agent",
   "version": "1.0.0",
-  "description": "CoCloud TSplus Windows Server Agent — provisions and manages RDP accounts",
+  "description": "CloudCRM TSplus Windows Server Agent — provisions and manages RDP accounts",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

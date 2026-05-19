@@ -1,6 +1,6 @@
 /**
  * TSplus Integration Library
- * Communicates with the CoCloud TSplus Agent running on the Windows Server.
+ * Communicates with the CloudCRM TSplus Agent running on the Windows Server.
  * All calls are authenticated with TSPLUS_AGENT_KEY.
  */
 

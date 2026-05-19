@@ -1,6 +1,6 @@
-# CoCloud TSplus Agent
+# CloudCRM TSplus Agent
 
-Runs on your Windows Server. Lets cocloud.in automatically provision
+Runs on your Windows Server. Lets CloudCRM.in automatically provision
 Tally + TSplus accounts when clients pay.
 
 ## One-Time Windows Server Setup
@@ -35,7 +35,7 @@ Download from nodejs.org — LTS version (v20+)
 
 ### 5. Set up the agent
 ```cmd
-cd C:\CoCloudAgent
+cd C:\CloudCRMAgent
 npm install
 copy .env.example .env
 notepad .env     # fill in your API key and paths
@@ -49,10 +49,10 @@ npm run install-service
 
 ### 7. Open Windows Firewall
 ```powershell
-New-NetFirewallRule -DisplayName "CoCloud Agent" -Direction Inbound -Protocol TCP -LocalPort 7820 -Action Allow
+New-NetFirewallRule -DisplayName "CloudCRM Agent" -Direction Inbound -Protocol TCP -LocalPort 7820 -Action Allow
 ```
 
-### 8. Configure in cocloud Admin Panel
+### 8. Configure in CloudCRM Admin Panel
 Go to Admin → Integrations → TSplus and enter:
 - Agent URL: http://YOUR-SERVER-IP:7820
 - API Key: (same as AGENT_API_KEY in .env)

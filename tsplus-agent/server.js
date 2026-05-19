@@ -1,6 +1,6 @@
 /**
- * CoCloud TSplus Agent
- * Runs on the Windows Server. Accepts HTTPS requests from cocloud (Vercel)
+ * CloudCRM TSplus Agent
+ * Runs on the Windows Server. Accepts HTTPS requests from CloudCRM (Vercel)
  * and executes PowerShell commands to manage TSplus/Windows users.
  *
  * Setup: node server.js
@@ -109,7 +109,7 @@ app.post("/provision", auth, async (req, res) => {
     // 1. Create Windows local user
     await psAsync(`
       $pass = ConvertTo-SecureString '${password}' -AsPlainText -Force;
-      New-LocalUser -Name '${username}' -Password $pass -FullName '${clientName}' -Description 'CoCloud Service ${serviceId}' -PasswordNeverExpires -UserMayNotChangePassword;
+      New-LocalUser -Name '${username}' -Password $pass -FullName '${clientName}' -Description 'CloudCRM Service ${serviceId}' -PasswordNeverExpires -UserMayNotChangePassword;
       Add-LocalGroupMember -Group 'Remote Desktop Users' -Member '${username}';
     `);
 
@@ -285,7 +285,7 @@ function updateAccountFile(serviceId, updates) {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`[CoCloud TSplus Agent] Running on port ${PORT}`);
-  console.log(`[CoCloud TSplus Agent] Tally base path: ${TALLY_BASE_PATH}`);
-  console.log(`[CoCloud TSplus Agent] TSplus server: ${TSPLUS_SERVER}`);
+  console.log(`[CloudCRM TSplus Agent] Running on port ${PORT}`);
+  console.log(`[CloudCRM TSplus Agent] Tally base path: ${TALLY_BASE_PATH}`);
+  console.log(`[CloudCRM TSplus Agent] TSplus server: ${TSPLUS_SERVER}`);
 });
