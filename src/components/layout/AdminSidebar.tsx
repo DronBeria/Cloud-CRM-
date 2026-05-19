@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, FileText, Server, MessageSquare,
   Package, Settings, Puzzle, CreditCard, Bell, Shield, ChevronLeft,
+  Zap, Activity, Link,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,10 +16,13 @@ const SHARED_NAV = [
   { href: "/admin/services", icon: Server, label: "Services" },
   { href: "/admin/tickets", icon: MessageSquare, label: "Tickets" },
   { href: "/admin/products", icon: Package, label: "Products" },
+  { href: "/admin/workflows", icon: Zap, label: "Workflows" },
   { href: "/admin/notifications", icon: Bell, label: "Notifications" },
 ];
 
 const ADMIN_ONLY_NAV = [
+  { href: "/admin/integrations", icon: Link, label: "Integrations" },
+  { href: "/admin/audit", icon: Activity, label: "Audit Log" },
   { href: "/admin/gateways", icon: CreditCard, label: "Gateways" },
   { href: "/admin/extensions", icon: Puzzle, label: "Extensions" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
