@@ -61,6 +61,13 @@ export async function processInvoicePaid(invoiceId: string) {
   }
 
   // 3. Activate pending services on this invoice's orders
+  // Pre-fetch all products in one query to avoid N+1
+  const allServiceIds = invoice.orders.flatMap((o) => o.services.map((s) => s.productId));
+  const products = allServiceIds.length > 0
+    ? await db.product.findMany({ where: { id: { in: allServiceIds } }, select: { id: true, slug: true } })
+    : [];
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
   for (const order of invoice.orders) {
     await db.order.update({ where: { id: order.id }, data: { status: "active" } });
 
@@ -73,7 +80,7 @@ export async function processInvoicePaid(invoiceId: string) {
         const meta = service.metadata as Record<string, string> | null;
         if (tsplusConfigured()) {
           try {
-            const product = await db.product.findUnique({ where: { id: service.productId } });
+            const product = productMap.get(service.productId);
             if (product && isTsplusProduct(product.slug)) {
               if (service.status === "pending" && !meta?.tsplus_username) {
                 // First time — provision the account

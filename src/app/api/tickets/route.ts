@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { sanitize, sanitizeShort } from "@/lib/sanitize";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -38,7 +39,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { subject, priority, message } = createSchema.parse(await req.json());
+    const body = createSchema.parse(await req.json());
+    const subject = sanitizeShort(body.subject);
+    const message = sanitize(body.message, 10000);
+    const priority = body.priority;
 
     const ticket = await db.ticket.create({
       data: {

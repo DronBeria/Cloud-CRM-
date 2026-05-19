@@ -10,7 +10,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import {
   User, Lock, Key, Shield, Bell, Monitor, Plus, Trash2,
   Copy, Eye, EyeOff, Loader2, CheckCircle, Clock, LogOut,
-  Smartphone, AlertTriangle,
+  Smartphone, AlertTriangle, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -479,6 +479,21 @@ export default function AccountPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* GDPR footer */}
+      <div className="border-t border-gray-100 pt-6 flex items-center justify-between text-xs text-gray-400">
+        <div className="flex items-center gap-4">
+          <a href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</a>
+          <a href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</a>
+        </div>
+        <a
+          href="/api/account/export"
+          download
+          className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+        >
+          <Download className="h-3.5 w-3.5" />Export My Data
+        </a>
+      </div>
     </div>
   );
 }

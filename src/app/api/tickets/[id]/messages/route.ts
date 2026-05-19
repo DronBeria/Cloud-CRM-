@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { sanitize } from "@/lib/sanitize";
 
 const schema = z.object({ message: z.string().min(1) });
 
@@ -33,7 +34,9 @@ export async function POST(
   }
 
   try {
-    const { message } = schema.parse(await req.json());
+    const body = schema.parse(await req.json());
+    const message = sanitize(body.message, 10000);
+    if (!message) return NextResponse.json({ error: "Message cannot be empty" }, { status: 400 });
 
     const isAdmin = sessionUser.role === "admin";
     const newStatus = isAdmin ? "replied" : "open";

@@ -44,14 +44,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
           });
 
-          if (!user?.password) return null;
+          if (!user?.password) {
+            db.auditLog.create({ data: { action: "login_failed", entity: "auth", entityId: credentials.email as string } }).catch(() => {});
+            return null;
+          }
 
-          const isValid = await bcrypt.compare(
-            credentials.password as string,
-            user.password
-          );
+          const isValid = await bcrypt.compare(credentials.password as string, user.password);
 
-          if (!isValid) return null;
+          if (!isValid) {
+            db.auditLog.create({ data: { userId: user.id, action: "login_failed", entity: "auth", entityId: user.id } }).catch(() => {});
+            return null;
+          }
 
           return {
             id: user.id,
