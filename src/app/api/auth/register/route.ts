@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { z } from "zod";
-import { sendWelcomeEmail } from "@/lib/email";
+import { sendNotification } from "@/lib/notifications";
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -55,8 +55,8 @@ export async function POST(req: NextRequest) {
       update: {},
     });
 
-    // Send welcome email (fire and forget)
-    sendWelcomeEmail(email, name).catch(console.error);
+    // Send welcome notification (fire and forget)
+    sendNotification("client_created", user.id, { userName: name }).catch(console.error);
 
     return NextResponse.json(
       { id: user.id, email: user.email, name: user.name },

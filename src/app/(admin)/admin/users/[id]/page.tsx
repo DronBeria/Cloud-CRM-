@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { isStaff } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { ArrowLeft, User, Server, FileText, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ export default async function AdminUserDetailPage({
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/admin/users">
+          <Link href="/admin/clients">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>

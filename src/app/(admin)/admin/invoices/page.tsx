@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
+import { isStaff } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { FileText } from "lucide-react";

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -13,9 +13,16 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (status !== "loading" && !session) {
+      router.replace("/login");
+    }
+  }, [status, session, router]);
+
+  if (status === "loading" || !session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -23,28 +30,21 @@ export default function ClientLayout({
     );
   }
 
-  if (!session) {
-    redirect("/login");
-  }
-
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar onMenuClick={() => setSidebarOpen(true)} />
 
       <div className="flex flex-1">
-        {/* Desktop Sidebar */}
         <div className="hidden md:flex">
           <Sidebar />
         </div>
 
-        {/* Mobile Sidebar */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetContent side="left" className="p-0 w-64">
             <Sidebar onClose={() => setSidebarOpen(false)} />
           </SheetContent>
         </Sheet>
 
-        {/* Main Content */}
         <main className="flex-1 overflow-auto">
           <div className="container max-w-6xl mx-auto p-6">{children}</div>
         </main>
