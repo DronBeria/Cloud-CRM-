@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { getSetting } from "@/lib/settings";
 import { sendNotification } from "@/lib/notifications";
+import { provisionService, suspendService, reactivateService, isTsplusProduct, isConfigured as tsplusConfigured } from "@/lib/tsplus";
 
 export function formatInvoiceNumber(
   number: number,
@@ -67,6 +68,44 @@ export async function processInvoicePaid(invoiceId: string) {
       if (service.status === "pending" || service.status === "suspended") {
         const now = new Date();
         const expiresAt = calculateNextExpiry(now, service.plan);
+
+        // TSplus auto-provisioning
+        const meta = service.metadata as Record<string, string> | null;
+        if (tsplusConfigured()) {
+          try {
+            const product = await db.product.findUnique({ where: { id: service.productId } });
+            if (product && isTsplusProduct(product.slug)) {
+              if (service.status === "pending" && !meta?.tsplus_username) {
+                // First time — provision the account
+                const result = await provisionService({
+                  serviceId: service.id,
+                  clientName: invoice.user.name,
+                  planName: service.plan?.name ?? "Standard",
+                  sessions: 1,
+                });
+                await db.service.update({
+                  where: { id: service.id },
+                  data: {
+                    metadata: {
+                      tsplus_username: result.username,
+                      tsplus_password: result.password,
+                      tsplus_launch_url: result.launchUrl,
+                      tsplus_server_url: result.serverUrl,
+                      tsplus_data_path: result.dataPath,
+                      tsplus_tally_path: result.tallyPath,
+                      tsplus_provisioned_at: new Date().toISOString(),
+                    },
+                  },
+                });
+              } else if (service.status === "suspended" && meta?.tsplus_username) {
+                // Reactivate suspended account
+                await reactivateService(service.id);
+              }
+            }
+          } catch (err) {
+            console.error("[TSplus] Provisioning error:", err);
+          }
+        }
 
         await db.service.update({
           where: { id: service.id },

@@ -301,6 +301,7 @@ model Service {
   cancellation     ServiceCancellation?
   upgrades         ServiceUpgrade[]
   configs          ServiceConfig[]
+  metadata         Json?
 }
 
 model ServiceCancellation {
@@ -552,6 +553,15 @@ model Lead {
   clientId    String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+model ClientNote {
+  id        String   @id @default(cuid())
+  clientId  String
+  staffId   String
+  note      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AuditLog {

@@ -7,17 +7,16 @@ import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import {
   ArrowLeft, Mail, Phone, MapPin, Building, Calendar,
-  FileText, Server, MessageSquare, CreditCard, Activity,
-  Edit, Trash2, Shield, UserCheck, Clock, TrendingUp,
-  IndianRupee, AlertCircle, CheckCircle, XCircle,
+  FileText, Server, MessageSquare, IndianRupee, UserCheck,
+  AlertTriangle, Clock, CheckCircle, XCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ClientActions } from "@/components/admin/ClientActions";
+import { ClientDetailTabs } from "@/components/admin/ClientDetailTabs";
 
-export const metadata: Metadata = { title: "Client Profile — Admin" };
+export const metadata: Metadata = { title: "Client Profile" };
 
 async function getInrRate() {
   try {
@@ -26,293 +25,244 @@ async function getInrRate() {
   } catch { return 83.5; }
 }
 
-const statusColors: Record<string, string> = {
-  active: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  pending: "bg-blue-50 text-blue-700 border-blue-200",
+const statusBadge: Record<string, string> = {
+  active:    "bg-emerald-50 text-emerald-700 border-emerald-200",
+  pending:   "bg-blue-50 text-blue-700 border-blue-200",
   suspended: "bg-yellow-50 text-yellow-700 border-yellow-200",
   cancelled: "bg-red-50 text-red-700 border-red-200",
-  paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  open: "bg-blue-50 text-blue-700 border-blue-200",
-  closed: "bg-gray-100 text-gray-600 border-gray-200",
+  paid:      "bg-emerald-50 text-emerald-700 border-emerald-200",
+  open:      "bg-blue-50 text-blue-700 border-blue-200",
+  replied:   "bg-violet-50 text-violet-700 border-violet-200",
+  closed:    "bg-gray-100 text-gray-600 border-gray-200",
 };
 
 export default async function ClientDetailPage({
   params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+}: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  if (!session || !isStaff(role)) redirect("/admin/login");
+  const sessionUser = session?.user as { role?: string; id?: string } | undefined;
+  if (!session || !isStaff(sessionUser?.role)) redirect("/admin/login");
 
   const inrRate = await getInrRate();
 
-  const client = await db.user.findUnique({
-    where: { id },
-    include: {
-      role: true,
-      invoices: {
-        include: { currency: true, items: true, transactions: true },
-        orderBy: { createdAt: "desc" },
+  const [client, notes] = await Promise.all([
+    db.user.findUnique({
+      where: { id },
+      include: {
+        role: true,
+        invoices: {
+          include: { currency: true, items: true, transactions: true },
+          orderBy: { createdAt: "desc" },
+        },
+        services: {
+          include: {
+            product: { include: { category: true } },
+            plan: { include: { prices: { include: { currency: true } } } },
+            currency: true,
+            cancellation: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        tickets: {
+          include: {
+            messages: {
+              include: { user: { select: { name: true, role: { select: { name: true } } } } },
+              orderBy: { createdAt: "asc" },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
+        },
+        credits: { include: { currency: true } },
       },
-      services: {
-        include: { product: true, plan: true, currency: true },
-        orderBy: { createdAt: "desc" },
-      },
-      tickets: {
-        include: { _count: { select: { messages: true } } },
-        orderBy: { updatedAt: "desc" },
-      },
-      credits: { include: { currency: true } },
-    },
-  });
+    }),
+    db.clientNote.findMany({
+      where: { clientId: id },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
   if (!client) notFound();
 
-  // Financials in INR
+  // Financial summary in INR
   const totalPaid = client.invoices
     .filter((i) => i.status === "paid")
     .reduce((sum, inv) => {
-      const t = inv.items.reduce((s, item) => s + Number(item.price) * item.quantity, 0);
-      const inr = inv.currency.code === "INR" ? t : (t / Number(inv.currency.exchangeRate)) * inrRate;
-      return sum + inr;
+      const t = inv.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+      return sum + (inv.currency.code === "INR" ? t : (t / Number(inv.currency.exchangeRate)) * inrRate);
     }, 0);
 
   const totalDue = client.invoices
     .filter((i) => i.status === "pending")
     .reduce((sum, inv) => {
-      const t = inv.items.reduce((s, item) => s + Number(item.price) * item.quantity, 0);
-      const inr = inv.currency.code === "INR" ? t : (t / Number(inv.currency.exchangeRate)) * inrRate;
-      return sum + inr;
+      const t = inv.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+      return sum + (inv.currency.code === "INR" ? t : (t / Number(inv.currency.exchangeRate)) * inrRate);
     }, 0);
 
-  const activeServices = client.services.filter((s) => s.status === "active").length;
-  const openTickets = client.tickets.filter((t) => t.status !== "closed").length;
+  const creditBalance = client.credits.reduce((s, c) => s + Number(c.amount), 0);
+  const activeServices = client.services.filter((s) => s.status === "active");
+  const openTickets = client.tickets.filter((t) => t.status !== "closed");
+  const tsplusServices = client.services.filter(
+    (s) => (s.metadata as Record<string, string> | null)?.tsplus_username
+  );
 
   const initials = client.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-  const isClientRole = client.role?.name === "user";
+
+  // Serializable data for client component
+  const clientData = {
+    id: client.id,
+    name: client.name,
+    email: client.email,
+    phone: client.phone,
+    city: client.city,
+    state: client.state,
+    country: client.country,
+    companyName: client.companyName,
+    address: client.address,
+    postcode: client.postcode,
+    createdAt: client.createdAt.toISOString(),
+    emailVerifiedAt: client.emailVerifiedAt?.toISOString(),
+    role: client.role?.name ?? "user",
+  };
+
+  const invoicesData = client.invoices.map((inv) => {
+    const total = inv.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+    const inr = inv.currency.code === "INR" ? total : (total / Number(inv.currency.exchangeRate)) * inrRate;
+    const paid = inv.transactions.filter((t) => t.status === "succeeded").reduce((s, t) => s + Number(t.amount), 0);
+    return {
+      id: inv.id,
+      invoiceNumber: inv.invoiceNumber ?? `#${inv.number}`,
+      number: inv.number,
+      status: inv.status,
+      total,
+      totalInr: Math.round(inr),
+      paid,
+      remaining: Math.max(0, total - paid),
+      currencyPrefix: inv.currency.prefix,
+      currencySuffix: inv.currency.suffix,
+      dueAt: inv.dueAt?.toISOString(),
+      paidAt: inv.paidAt?.toISOString(),
+      createdAt: inv.createdAt.toISOString(),
+      itemCount: inv.items.length,
+    };
+  });
+
+  const servicesData = client.services.map((s) => {
+    const meta = s.metadata as Record<string, string> | null;
+    const price = Number(s.price);
+    const priceInr = s.currency.code === "INR" ? price : (price / Number(s.currency.exchangeRate)) * inrRate;
+    return {
+      id: s.id,
+      productName: s.product.name,
+      categoryName: s.product.category?.name,
+      planName: s.plan?.name,
+      status: s.status,
+      priceInr: Math.round(priceInr),
+      expiresAt: s.expiresAt?.toISOString(),
+      createdAt: s.createdAt.toISOString(),
+      hasCancellation: !!s.cancellation,
+      cancellationType: s.cancellation?.type,
+      // TSplus data
+      tsplus: meta?.tsplus_username ? {
+        username: meta.tsplus_username,
+        password: meta.tsplus_password,
+        launchUrl: meta.tsplus_launch_url,
+        serverUrl: meta.tsplus_server_url,
+        dataPath: meta.tsplus_data_path,
+        tallyPath: meta.tsplus_tally_path,
+        provisionedAt: meta.tsplus_provisioned_at,
+      } : null,
+    };
+  });
+
+  const ticketsData = client.tickets.map((t) => ({
+    id: t.id,
+    subject: t.subject,
+    status: t.status,
+    priority: t.priority,
+    department: t.department,
+    createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
+    messageCount: t.messages.length,
+    messages: t.messages.map((m) => ({
+      id: m.id,
+      message: m.message,
+      isStaff: m.isStaff,
+      authorName: m.user.name,
+      authorRole: m.user.role?.name ?? "user",
+      createdAt: m.createdAt.toISOString(),
+    })),
+  }));
+
+  const notesData = notes.map((n) => ({
+    id: n.id,
+    note: n.note,
+    createdAt: n.createdAt.toISOString(),
+  }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 mt-1" asChild>
+      <div className="flex items-start gap-3">
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 mt-0.5" asChild>
           <Link href="/admin/clients"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 font-bold text-lg shrink-0">
-              {initials}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 font-bold text-base shrink-0">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-gray-900">{client.name}</h1>
+              {client.emailVerifiedAt && (
+                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                  <UserCheck className="h-2.5 w-2.5" />Verified
+                </span>
+              )}
+              {tsplusServices.length > 0 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 font-medium">
+                  🖥️ TSplus
+                </span>
+              )}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-gray-900">{client.name}</h1>
-                <Badge className={`text-xs border ${isClientRole ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
-                  {client.role?.name ?? "user"}
-                </Badge>
-                {client.emailVerifiedAt && (
-                  <Badge className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <UserCheck className="h-3 w-3 mr-1" />Verified
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 mt-0.5">{client.email}</p>
-            </div>
-            <div className="ml-auto">
-              <ClientActions clientId={id} clientName={client.name} clientRole={client.role?.name ?? "user"} />
-            </div>
+            <p className="text-sm text-gray-500">{client.email}</p>
           </div>
         </div>
       </div>
 
-      {/* Stat strip */}
+      {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Paid", value: `₹${Math.round(totalPaid).toLocaleString("en-IN")}`, icon: IndianRupee, color: "text-emerald-600", bg: "bg-emerald-50" },
-          { label: "Amount Due", value: `₹${Math.round(totalDue).toLocaleString("en-IN")}`, icon: AlertCircle, color: totalDue > 0 ? "text-red-500" : "text-gray-400", bg: totalDue > 0 ? "bg-red-50" : "bg-gray-50" },
-          { label: "Active Services", value: activeServices, icon: Server, color: "text-blue-600", bg: "bg-blue-50" },
-          { label: "Open Tickets", value: openTickets, icon: MessageSquare, color: "text-orange-600", bg: "bg-orange-50" },
+          { label: "Total Paid", value: `₹${Math.round(totalPaid).toLocaleString("en-IN")}`, color: "text-emerald-600", bg: "bg-emerald-50", icon: IndianRupee },
+          { label: "Outstanding", value: `₹${Math.round(totalDue).toLocaleString("en-IN")}`, color: totalDue > 0 ? "text-red-500" : "text-gray-400", bg: totalDue > 0 ? "bg-red-50" : "bg-gray-50", icon: AlertTriangle },
+          { label: "Active Services", value: activeServices.length, color: "text-blue-600", bg: "bg-blue-50", icon: Server },
+          { label: "Open Tickets", value: openTickets.length, color: "text-orange-600", bg: "bg-orange-50", icon: MessageSquare },
         ].map((s) => {
           const Icon = s.icon;
           return (
             <div key={s.label} className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-100">
-              <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${s.bg} shrink-0`}>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${s.bg} shrink-0`}>
                 <Icon className={`h-4 w-4 ${s.color}`} />
               </div>
               <div>
                 <p className="text-xs text-gray-400">{s.label}</p>
-                <p className="text-lg font-bold text-gray-900">{s.value}</p>
+                <p className="text-lg font-bold text-gray-900 leading-tight">{s.value}</p>
               </div>
             </div>
           );
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Profile details */}
-        <div className="space-y-4">
-          <Card className="border-gray-100">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-gray-600">Profile</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-              {[
-                { icon: Mail, label: "Email", value: client.email },
-                client.phone && { icon: Phone, label: "Phone", value: client.phone },
-                client.companyName && { icon: Building, label: "Company", value: client.companyName },
-                (client.city || client.country) && {
-                  icon: MapPin, label: "Location",
-                  value: [client.city, client.state, client.country].filter(Boolean).join(", "),
-                },
-                { icon: Calendar, label: "Joined", value: formatDate(client.createdAt) },
-              ].filter(Boolean).map((item: any) => {
-                const Icon = item.icon;
-                return (
-                  <div key={item.label} className="flex items-start gap-2.5 text-sm">
-                    <Icon className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs text-gray-400">{item.label}</p>
-                      <p className="text-gray-700 font-medium">{item.value}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          {/* Credits */}
-          {client.credits.length > 0 && (
-            <Card className="border-gray-100">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-gray-600">Credits</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 space-y-2">
-                {client.credits.map((c) => (
-                  <div key={c.id} className="flex justify-between text-sm">
-                    <span className="text-gray-500">{c.currency.code}</span>
-                    <span className="font-semibold text-emerald-600">
-                      {c.currency.prefix}{Number(c.amount).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Right: Tabs content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Services */}
-          <Card className="border-gray-100">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-gray-600 flex items-center gap-2">
-                  <Server className="h-4 w-4 text-gray-400" />Services ({client.services.length})
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {client.services.length === 0 ? (
-                <p className="text-sm text-gray-400 py-4 text-center">No services yet</p>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {client.services.map((s) => {
-                    const priceInr = s.currency.code === "INR"
-                      ? Number(s.price)
-                      : (Number(s.price) / Number(s.currency.exchangeRate)) * inrRate;
-                    return (
-                      <div key={s.id} className="flex items-center gap-3 py-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 shrink-0">
-                          <Server className="h-3.5 w-3.5 text-blue-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800">{s.product.name}</p>
-                          <p className="text-xs text-gray-400">{s.plan?.name} · {s.label ?? ""}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-semibold text-gray-800">₹{Math.round(priceInr).toLocaleString("en-IN")}</p>
-                          {s.expiresAt && (
-                            <p className="text-xs text-gray-400">Renews {formatDate(s.expiresAt)}</p>
-                          )}
-                        </div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusColors[s.status] ?? "bg-gray-100 text-gray-600"}`}>
-                          {s.status}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Invoices */}
-          <Card className="border-gray-100">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-gray-600 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-gray-400" />Invoices ({client.invoices.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {client.invoices.length === 0 ? (
-                <p className="text-sm text-gray-400 py-4 text-center">No invoices yet</p>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {client.invoices.slice(0, 8).map((inv) => {
-                    const total = inv.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
-                    const inr = inv.currency.code === "INR" ? total : (total / Number(inv.currency.exchangeRate)) * inrRate;
-                    return (
-                      <div key={inv.id} className="flex items-center gap-3 py-2.5">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800">
-                            {inv.invoiceNumber ?? `#${inv.number}`}
-                          </p>
-                          <p className="text-xs text-gray-400">{formatDate(inv.createdAt)}</p>
-                        </div>
-                        <p className="text-sm font-semibold text-gray-800">
-                          ₹{Math.round(inr).toLocaleString("en-IN")}
-                        </p>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusColors[inv.status] ?? "bg-gray-100 text-gray-600"}`}>
-                          {inv.status}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Tickets */}
-          <Card className="border-gray-100">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-gray-600 flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-gray-400" />Support Tickets ({client.tickets.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {client.tickets.length === 0 ? (
-                <p className="text-sm text-gray-400 py-4 text-center">No tickets</p>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {client.tickets.map((t) => (
-                    <div key={t.id} className="flex items-center gap-3 py-2.5">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{t.subject}</p>
-                        <p className="text-xs text-gray-400">{t._count.messages} messages · {formatDate(t.updatedAt)}</p>
-                      </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium shrink-0 ${statusColors[t.status] ?? "bg-gray-100 text-gray-600"}`}>
-                        {t.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      {/* Tabbed detail view */}
+      <ClientDetailTabs
+        client={clientData}
+        invoices={invoicesData}
+        services={servicesData}
+        tickets={ticketsData}
+        notes={notesData}
+        staffId={sessionUser?.id ?? ""}
+        creditBalance={creditBalance}
+      />
     </div>
   );
 }

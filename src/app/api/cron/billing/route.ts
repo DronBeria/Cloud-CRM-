@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getBillingSettings } from "@/lib/settings";
 import { getFormattedInvoiceNumber } from "@/lib/billing";
 import { sendNotification } from "@/lib/notifications";
+import { suspendService as tsplusSuspend, isTsplusProduct, isConfigured as tsplusConfigured } from "@/lib/tsplus";
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret");
@@ -40,6 +41,19 @@ export async function POST(req: NextRequest) {
           where: { id: service.id },
           data: { status: "suspended", suspendedAt: now },
         });
+
+        // Auto-suspend TSplus account
+        if (tsplusConfigured()) {
+          try {
+            const product = await db.product.findUnique({ where: { id: service.productId } });
+            if (product && isTsplusProduct(product.slug)) {
+              await tsplusSuspend(service.id);
+            }
+          } catch (err) {
+            console.error("[TSplus] Suspension error:", err);
+          }
+        }
+
         await sendNotification("service_suspended", service.userId, {
           serviceName: service.label ?? service.id,
           invoiceUrl: `/invoices/${invoice.id}`,
