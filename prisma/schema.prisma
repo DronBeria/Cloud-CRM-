@@ -538,6 +538,22 @@ model ApiKey {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Lead {
+  id          String    @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  source      String    @default("website")
+  serviceId   String?
+  notes       String?
+  status      String    @default("new")
+  assignedTo  String?
+  convertedAt DateTime?
+  clientId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
 model UserSession {
   id           String    @id @default(cuid())
   userId       String

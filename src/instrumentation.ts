@@ -12,6 +12,12 @@ export async function register() {
       });
 
       await db.role.upsert({
+        where: { name: "manager" },
+        create: { name: "manager", permissions: ["view", "create", "edit", "delete_client"] },
+        update: {},
+      });
+
+      await db.role.upsert({
         where: { name: "user" },
         create: { name: "user", permissions: [] },
         update: {},
