@@ -4,16 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, FileText, Server, MessageSquare,
-  Package, Settings, Puzzle, CreditCard, Bell, Shield,
-  ChevronLeft, UserPlus, Tag,
+  Package, Settings, Puzzle, CreditCard, Bell, Shield, ChevronLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Items available to both admin and manager
 const SHARED_NAV = [
   { href: "/admin", icon: LayoutDashboard, label: "Overview" },
-  { href: "/admin/leads", icon: UserPlus, label: "Leads" },
-  { href: "/admin/users", icon: Users, label: "Clients" },
+  { href: "/admin/clients", icon: Users, label: "Clients" },
   { href: "/admin/invoices", icon: FileText, label: "Invoices" },
   { href: "/admin/services", icon: Server, label: "Services" },
   { href: "/admin/tickets", icon: MessageSquare, label: "Tickets" },
@@ -21,7 +18,6 @@ const SHARED_NAV = [
   { href: "/admin/notifications", icon: Bell, label: "Notifications" },
 ];
 
-// Items visible only to admins
 const ADMIN_ONLY_NAV = [
   { href: "/admin/gateways", icon: CreditCard, label: "Gateways" },
   { href: "/admin/extensions", icon: Puzzle, label: "Extensions" },
@@ -36,37 +32,35 @@ interface AdminSidebarProps {
 export function AdminSidebar({ role, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
   const isAdmin = role === "admin";
-
-  const navItems = isAdmin
-    ? [...SHARED_NAV, ...ADMIN_ONLY_NAV]
-    : SHARED_NAV;
+  const navItems = isAdmin ? [...SHARED_NAV, ...ADMIN_ONLY_NAV] : SHARED_NAV;
 
   return (
-    <aside className="flex h-full w-64 flex-col bg-sidebar border-r border-sidebar-border">
-      <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
+    <aside className="flex h-full w-60 flex-col bg-white border-r border-gray-100">
+      {/* Logo */}
+      <div className="flex h-14 items-center justify-between px-4 border-b border-gray-100">
         <Link
           href="/admin"
-          className="flex items-center gap-2 font-bold text-lg text-sidebar-foreground"
+          className="flex items-center gap-2.5 font-semibold text-gray-900"
           onClick={onClose}
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-orange-500 text-white text-xs font-bold">
-            <Shield className="h-4 w-4" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500 text-white text-xs font-bold shrink-0">
+            <Shield className="h-3.5 w-3.5" />
           </div>
-          <span>
-            {isAdmin ? "Admin" : "Manager"}
-          </span>
+          <span className="text-sm">{isAdmin ? "Admin" : "Manager"} Panel</span>
         </Link>
         <Link
           href="/dashboard"
-          className="text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
-          title="View Client Portal"
+          className="text-gray-300 hover:text-gray-500 transition-colors"
+          title="Client Portal"
+          onClick={onClose}
         >
           <ChevronLeft className="h-4 w-4" />
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3">
+        <div className="space-y-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -75,39 +69,57 @@ export function AdminSidebar({ role, onClose }: AdminSidebarProps) {
                 : pathname.startsWith(item.href);
 
             return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={onClose}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-orange-500/20 text-orange-400"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {item.label}
-                </Link>
-              </li>
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all",
+                  isActive
+                    ? "bg-orange-50 text-orange-600 font-medium"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-orange-500" : "text-gray-400")} />
+                {item.label}
+              </Link>
             );
           })}
-        </ul>
+        </div>
 
-        {!isAdmin && (
-          <div className="mt-4 px-3 py-2 rounded-md bg-orange-500/10 border border-orange-500/20">
-            <p className="text-xs text-orange-400 font-medium">Manager Access</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Gateways and settings are admin-only.
-            </p>
-          </div>
+        {isAdmin && (
+          <>
+            <div className="mt-4 mb-2 px-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">System</p>
+            </div>
+            <div className="space-y-0.5">
+              {ADMIN_ONLY_NAV.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onClose}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all",
+                      isActive
+                        ? "bg-orange-50 text-orange-600 font-medium"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    )}
+                  >
+                    <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-orange-500" : "text-gray-400")} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </>
         )}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3">
-        <p className="text-xs text-sidebar-foreground/40 text-center capitalize">
-          {role} · Staff Portal
-        </p>
+      <div className="border-t border-gray-100 px-3 py-3">
+        <p className="text-[10px] text-gray-300 capitalize">{role} access</p>
       </div>
     </aside>
   );

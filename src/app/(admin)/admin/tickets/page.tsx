@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Tickets — Admin" };
 export default async function AdminTicketsPage() {
   const session = await auth();
   const sessionUser = session?.user as { role?: string } | undefined;
-  if (!session || sessionUser?.role !== "admin") redirect("/dashboard");
+  if (!session || !isStaff(sessionUser?.role)) redirect("/admin/login");
 
   const tickets = await db.ticket.findMany({
     include: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
@@ -17,19 +17,21 @@ export default function AdminLayout({
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  if (status === "loading") {
+  const role = (session?.user as { role?: string } | undefined)?.role;
+
+  // All hooks must be called before any conditional returns
+  useEffect(() => {
+    if (status !== "loading" && (!session || !isStaff(role))) {
+      router.replace("/admin/login");
+    }
+  }, [status, session, role, router]);
+
+  if (status === "loading" || !session || !isStaff(role)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
-  }
-
-  const role = (session?.user as { role?: string } | undefined)?.role;
-
-  if (!session || !isStaff(role)) {
-    router.replace("/admin/login");
-    return null;
   }
 
   return (

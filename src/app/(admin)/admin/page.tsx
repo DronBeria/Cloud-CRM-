@@ -2,49 +2,44 @@ import { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
+import { isStaff } from "@/lib/permissions";
 import {
-  Users,
-  FileText,
-  Server,
-  DollarSign,
-  MessageSquare,
-  TrendingUp,
+  Users, FileText, Server, DollarSign, MessageSquare,
+  TrendingUp, Clock, AlertCircle, UserPlus,
 } from "lucide-react";
-import { StatsCard } from "@/components/dashboard/StatsCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 
-export const metadata: Metadata = { title: "Admin Dashboard" };
+export const metadata: Metadata = { title: "Dashboard — Admin" };
 
 export default async function AdminDashboardPage() {
   const session = await auth();
-  const user = session?.user as { role?: string } | undefined;
-  if (!session || user?.role !== "admin") redirect("/dashboard");
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  if (!session || !isStaff(role)) redirect("/admin/login");
+
+  const clientRole = await db.role.findFirst({ where: { name: "user" } });
+  const clientRoleId = clientRole?.id;
 
   const [
-    totalUsers,
-    totalInvoices,
+    totalClients,
     activeServices,
     openTickets,
+    pendingLeads,
     recentInvoices,
-    recentUsers,
+    recentClients,
+    revenue,
+    pendingInvoicesCount,
   ] = await Promise.all([
-    db.user.count(),
-    db.invoice.count(),
+    // Only count actual clients, not staff
+    db.user.count({ where: { roleId: clientRoleId } }),
     db.service.count({ where: { status: "active" } }),
     db.ticket.count({ where: { status: { in: ["open", "replied"] } } }),
+    db.lead.count({ where: { status: { in: ["new", "contacted", "qualified"] } } }),
     db.invoice.findMany({
-      take: 5,
+      take: 6,
       orderBy: { createdAt: "desc" },
       include: {
         user: { select: { name: true, email: true } },
@@ -52,162 +47,183 @@ export default async function AdminDashboardPage() {
         items: true,
       },
     }),
+    // Recent clients only
     db.user.findMany({
+      where: { roleId: clientRoleId },
       take: 5,
       orderBy: { createdAt: "desc" },
-      include: { role: true },
+      include: {
+        _count: { select: { services: true, invoices: true } },
+      },
     }),
+    db.invoiceTransaction.aggregate({
+      where: { status: "succeeded" },
+      _sum: { amount: true },
+    }),
+    db.invoice.count({ where: { status: "pending" } }),
   ]);
 
-  const totalRevenue = await db.invoiceTransaction.aggregate({
-    where: { status: "succeeded" },
-    _sum: { amount: true },
-  });
+  const totalRevenue = Number(revenue._sum.amount ?? 0);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Platform overview and analytics
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Overview</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Platform summary and recent activity</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard
-          title="Total Users"
-          value={totalUsers}
-          icon={Users}
-          iconColor="text-blue-500"
-        />
-        <StatsCard
-          title="Total Revenue"
-          value={`$${Number(totalRevenue._sum.amount ?? 0).toFixed(2)}`}
-          icon={DollarSign}
-          iconColor="text-green-500"
-        />
-        <StatsCard
-          title="Active Services"
-          value={activeServices}
-          icon={Server}
-          iconColor="text-purple-500"
-        />
-        <StatsCard
-          title="Open Tickets"
-          value={openTickets}
-          icon={MessageSquare}
-          iconColor="text-orange-500"
-        />
+      {/* Pending leads alert */}
+      {pendingLeads > 0 && (
+        <Link href="/admin/clients?tab=leads">
+          <div className="flex items-center gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg cursor-pointer hover:bg-orange-100 transition-colors">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 shrink-0">
+              <UserPlus className="h-4 w-4 text-orange-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-orange-800">
+                {pendingLeads} new {pendingLeads === 1 ? "lead" : "leads"} waiting for review
+              </p>
+              <p className="text-xs text-orange-600 mt-0.5">Click to review and accept clients</p>
+            </div>
+            <Badge className="bg-orange-500 text-white border-0">{pendingLeads}</Badge>
+          </div>
+        </Link>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: "Total Clients", value: totalClients, icon: Users, color: "text-blue-500", bg: "bg-blue-50", href: "/admin/clients" },
+          { label: "Revenue", value: `$${totalRevenue.toFixed(2)}`, icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-50", href: "/admin/invoices" },
+          { label: "Active Services", value: activeServices, icon: Server, color: "text-violet-500", bg: "bg-violet-50", href: "/admin/services" },
+          { label: "Open Tickets", value: openTickets, icon: MessageSquare, color: "text-orange-500", bg: "bg-orange-50", href: "/admin/tickets" },
+        ].map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <Link key={stat.label} href={stat.href}>
+              <Card className="border-gray-100 hover:shadow-sm transition-shadow cursor-pointer">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{stat.label}</p>
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${stat.bg}`}>
+                      <Icon className={`h-4 w-4 ${stat.color}`} />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Secondary stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="border-gray-100">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-50 shrink-0">
+              <Clock className="h-5 w-5 text-yellow-500" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Pending Invoices</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white mt-0.5">{pendingInvoicesCount}</p>
+            </div>
+            <Button variant="outline" size="sm" className="ml-auto" asChild>
+              <Link href="/admin/invoices?status=pending">View</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-100">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 shrink-0">
+              <UserPlus className="h-5 w-5 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Pending Leads</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white mt-0.5">{pendingLeads}</p>
+            </div>
+            <Button variant="outline" size="sm" className="ml-auto" asChild>
+              <Link href="/admin/clients?tab=leads">Review</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Recent Invoices
-            </CardTitle>
+        {/* Recent Invoices */}
+        <Card className="border-gray-100">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold text-gray-700">Recent Invoices</CardTitle>
+              <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
+                <Link href="/admin/invoices">View all</Link>
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentInvoices.map((inv) => {
-                  const total = inv.items.reduce(
-                    (s, i) => s + Number(i.price) * i.quantity,
-                    0
-                  );
-                  return (
-                    <TableRow key={inv.id}>
-                      <TableCell>
-                        <Link
-                          href={`/admin/invoices`}
-                          className="font-medium hover:text-primary"
-                        >
-                          #{inv.number}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {inv.user.name}
-                      </TableCell>
-                      <TableCell>
-                        {inv.currency.prefix}
-                        {total.toFixed(2)}
-                        {inv.currency.suffix}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            inv.status === "paid"
-                              ? "success"
-                              : inv.status === "cancelled"
-                              ? "destructive"
-                              : "info"
-                          }
-                        >
-                          {inv.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+          <CardContent className="pt-0">
+            <div className="space-y-3">
+              {recentInvoices.map((inv) => {
+                const total = inv.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+                return (
+                  <div key={inv.id} className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{inv.user.name}</p>
+                      <p className="text-xs text-gray-400">{inv.invoiceNumber ?? `#${inv.number}`}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-semibold text-gray-800">
+                        {inv.currency.prefix}{total.toFixed(2)}{inv.currency.suffix}
+                      </p>
+                      <Badge
+                        variant={inv.status === "paid" ? "success" : inv.status === "cancelled" ? "destructive" : "info"}
+                        className="text-[10px] h-4 px-1.5"
+                      >
+                        {inv.status}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+              {recentInvoices.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">No invoices yet</p>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Recent Users
-            </CardTitle>
+        {/* Recent Clients */}
+        <Card className="border-gray-100">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold text-gray-700">Recent Clients</CardTitle>
+              <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
+                <Link href="/admin/clients">View all</Link>
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Joined</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentUsers.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell>
-                      <Link
-                        href={`/admin/users/${u.id}`}
-                        className="font-medium hover:text-primary"
-                      >
-                        {u.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {u.email}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={u.role?.name === "admin" ? "default" : "secondary"}
-                      >
-                        {u.role?.name ?? "user"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {formatDate(u.createdAt)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <CardContent className="pt-0">
+            <div className="space-y-3">
+              {recentClients.map((client) => (
+                <Link key={client.id} href={`/admin/clients/${client.id}`}>
+                  <div className="flex items-center gap-3 hover:bg-gray-50 rounded-lg p-1.5 -mx-1.5 transition-colors">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 text-xs font-semibold shrink-0">
+                      {client.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{client.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{client.email}</p>
+                    </div>
+                    <div className="text-right shrink-0 text-xs text-gray-400">
+                      <p>{client._count.services} services</p>
+                      <p>{formatDate(client.createdAt)}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              {recentClients.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">No clients yet</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

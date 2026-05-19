@@ -19,7 +19,7 @@ export default async function AdminUserDetailPage({
   const { id } = await params;
   const session = await auth();
   const sessionUser = session?.user as { role?: string } | undefined;
-  if (!session || sessionUser?.role !== "admin") redirect("/dashboard");
+  if (!session || !isStaff(sessionUser?.role)) redirect("/admin/login");
 
   const user = await db.user.findUnique({
     where: { id },

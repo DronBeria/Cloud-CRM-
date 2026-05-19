@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: "Services — Admin" };
 export default async function AdminServicesPage() {
   const session = await auth();
   const sessionUser = session?.user as { role?: string } | undefined;
-  if (!session || sessionUser?.role !== "admin") redirect("/dashboard");
+  if (!session || !isStaff(sessionUser?.role)) redirect("/admin/login");
 
   const services = await db.service.findMany({
     include: {

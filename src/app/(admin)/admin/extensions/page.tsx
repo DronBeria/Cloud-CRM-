@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: "Extensions — Admin" };
 export default async function AdminExtensionsPage() {
   const session = await auth();
   const sessionUser = session?.user as { role?: string } | undefined;
-  if (!session || sessionUser?.role !== "admin") redirect("/dashboard");
+  if (!session || !isStaff(sessionUser?.role)) redirect("/admin/login");
 
   const extensions = await db.extension.findMany({
     orderBy: { name: "asc" },
