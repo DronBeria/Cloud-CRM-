@@ -45,8 +45,9 @@ function LoginForm() {
         return;
       }
 
+      // Don't call router.refresh() — it triggers a cold-start server re-render (adds 2-4s)
+      // Supabase sets cookies automatically; the next page will have the session
       router.push(callbackUrl);
-      router.refresh();
     } catch {
       toast.error("Something went wrong.");
     } finally {

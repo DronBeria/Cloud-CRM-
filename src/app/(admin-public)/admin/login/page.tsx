@@ -46,7 +46,6 @@ function StaffLoginForm() {
       }
 
       router.push(callbackUrl);
-      router.refresh();
     } catch {
       toast.error("Something went wrong.");
     } finally {

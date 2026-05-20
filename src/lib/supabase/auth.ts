@@ -9,19 +9,50 @@ export type AppUser = {
   role: string;
 };
 
-/** Get current authenticated user. Returns null if not logged in. */
+/** Get current authenticated user. Auto-creates Prisma user on first login. */
 export async function getUser(): Promise<AppUser | null> {
   try {
     const supabase = await createClient();
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return null;
-    return {
-      id: (user.app_metadata?.prisma_id as string) ?? user.id,
-      supabaseId: user.id,
-      email: user.email ?? "",
-      name: (user.user_metadata?.name as string) ?? user.email ?? "",
-      role: (user.app_metadata?.role as string) ?? "user",
-    };
+
+    let prismaId = user.app_metadata?.prisma_id as string | undefined;
+    const role = (user.app_metadata?.role as string) ?? "user";
+    const name = (user.user_metadata?.name as string) ?? user.email ?? "";
+
+    // If no prisma_id, find or create the Prisma user and link it
+    if (!prismaId) {
+      const { db } = await import("@/lib/db");
+      let prismaUser = await db.user.findUnique({
+        where: { email: user.email! },
+        select: { id: true },
+      });
+
+      if (!prismaUser) {
+        // Auto-create Prisma user for Supabase-only accounts
+        const userRole = await db.role.findFirst({ where: { name: "user" }, select: { id: true } });
+        prismaUser = await db.user.create({
+          data: {
+            email: user.email!,
+            name,
+            password: "", // Supabase manages auth
+            roleId: userRole?.id,
+            emailVerifiedAt: new Date(),
+          },
+          select: { id: true },
+        });
+      }
+
+      prismaId = prismaUser.id;
+
+      // Link back to Supabase (fire-and-forget — don't block the response)
+      const admin = createAdminClient();
+      admin.auth.admin.updateUserById(user.id, {
+        app_metadata: { prisma_id: prismaId, role },
+      }).catch(() => {});
+    }
+
+    return { id: prismaId, supabaseId: user.id, email: user.email ?? "", name, role };
   } catch { return null; }
 }
 
