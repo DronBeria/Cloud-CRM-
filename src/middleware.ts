@@ -1,67 +1,41 @@
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/lib/auth.config";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+/**
+ * Middleware uses ONLY the edge-compatible authConfig — no Prisma, no bcrypt.
+ * Runs on Vercel Edge Runtime: zero cold starts, globally distributed, ~1ms overhead.
+ */
+const { auth } = NextAuth(authConfig);
+
 const STAFF_ROLES = ["admin", "manager"];
 
-const PUBLIC_PATHS = [
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/admin/login",
-  "/api/auth",
-  "/api/webhooks",
-  "/api/payment",
-  "/api/health",
-  "/api/inngest",
-  "/monitoring",
-  "/privacy",
-  "/terms",
+const PUBLIC_PREFIXES = [
+  "/products", "/api/auth", "/api/webhooks", "/api/payment",
+  "/api/health", "/api/inngest", "/monitoring", "/_next", "/favicon",
 ];
+const PUBLIC_EXACT = new Set(["/", "/login", "/register", "/forgot-password", "/admin/login", "/privacy", "/terms"]);
 
 function isPublic(pathname: string) {
-  return (
-    pathname === "/" ||
-    pathname.startsWith("/products") ||
-    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
-  );
+  return PUBLIC_EXACT.has(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
-const SECURITY_HEADERS: Record<string, string> = {
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-};
-
-// Use NextAuth v5's own auth() as middleware — reads the correct authjs cookie
-export default auth((req) => {
+export default auth((req: NextRequest & { auth: { user?: { role?: string; id?: string } } | null }) => {
   const { pathname } = req.nextUrl;
 
-  // Skip static files
-  if (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon") ||
-    pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff2?)$/)
-  ) {
-    return NextResponse.next();
-  }
+  if (pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff2?|ttf|map)$/)) return NextResponse.next();
+  if (isPublic(pathname)) return NextResponse.next();
 
   const session = req.auth;
-  const role = (session?.user as { role?: string } | undefined)?.role;
+  const role = session?.user?.role as string | undefined;
+  const userId = session?.user?.id as string | undefined;
 
-  const addHeaders = (res: NextResponse) => {
-    Object.entries(SECURITY_HEADERS).forEach(([k, v]) => res.headers.set(k, v));
-    // Pass user info to server components via headers (avoids double JWT decode)
-    if (session?.user) {
-      res.headers.set("x-user-id", session.user.id ?? "");
-      res.headers.set("x-user-role", role ?? "user");
-    }
+  const injectHeaders = (res: NextResponse) => {
+    if (userId) res.headers.set("x-user-id", userId);
+    if (role) res.headers.set("x-user-role", role ?? "user");
     return res;
   };
-
-  if (isPublic(pathname)) {
-    return addHeaders(NextResponse.next());
-  }
 
   // Admin routes
   if (pathname.startsWith("/admin")) {
@@ -73,7 +47,7 @@ export default auth((req) => {
     if (!STAFF_ROLES.includes(role ?? "")) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
-    return addHeaders(NextResponse.next());
+    return injectHeaders(NextResponse.next());
   }
 
   // Client routes
@@ -87,7 +61,7 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/admin", req.url));
   }
 
-  return addHeaders(NextResponse.next());
+  return injectHeaders(NextResponse.next());
 });
 
 export const config = {

@@ -1,26 +1,20 @@
+/**
+ * Full auth config with PrismaAdapter — used in API routes and Server Components.
+ * NOT imported by middleware (would break Edge Runtime).
+ */
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import Credentials from "next-auth/providers/credentials";
-import Discord from "next-auth/providers/discord";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { authConfig } from "@/lib/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(db),
-  trustHost: true,
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
   providers: [
-    Discord({
-      clientId: process.env.AUTH_DISCORD_ID ?? "",
-      clientSecret: process.env.AUTH_DISCORD_SECRET ?? "",
-    }),
+    // Override Credentials with the real implementation (needs bcrypt + DB)
+    ...authConfig.providers.filter((p) => p.id !== "credentials"),
     Credentials({
       name: "credentials",
       credentials: {
@@ -51,25 +45,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = (user as { role?: string }).role ?? "user";
-        token.roleId = (user as { roleId?: string }).roleId;
-      }
-      // No DB call on token refresh — role is persisted in JWT
-      return token;
-    },
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string;
-        (session.user as { role?: string }).role = (token.role as string) ?? "user";
-        (session.user as { roleId?: string }).roleId = token.roleId as string | undefined;
-      }
-      return session;
-    },
-  },
   events: {
     async createUser({ user }) {
       try {
@@ -78,8 +53,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       } catch { /* non-fatal */ }
     },
     async signIn({ user }) {
-      // Fire-and-forget — never blocks the login response
       if (!user?.id) return;
+      // Fire-and-forget — never blocks login
       db.userSession.create({ data: { userId: user.id, token: `s_${Date.now()}`, lastActiveAt: new Date() } }).catch(() => {});
     },
   },
