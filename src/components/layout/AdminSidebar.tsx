@@ -8,7 +8,8 @@ import {
   ChevronLeft, Zap, Activity, Link2, LogOut, Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { signOut } from "next-auth/react";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
 interface NavItem {
   href: string;
@@ -60,7 +61,15 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ role, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const isAdmin = role === "admin";
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/admin/login");
+    router.refresh();
+  };
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
@@ -135,7 +144,7 @@ export function AdminSidebar({ role, onClose }: AdminSidebarProps) {
       {/* Footer */}
       <div className="border-t border-gray-100 p-2">
         <button
-          onClick={() => signOut({ callbackUrl: "/admin/login" })}
+          onClick={handleSignOut}
           className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all w-full"
         >
           <LogOut className="h-4 w-4 shrink-0" />

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { ArrowLeft, Package, ShoppingCart, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +32,7 @@ interface Product {
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { data: session } = useSession();
+  // session removed
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);

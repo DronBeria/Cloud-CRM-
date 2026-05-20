@@ -1,190 +1,108 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import {
-  Moon,
-  Sun,
-  Menu,
-  Bell,
-  ShoppingCart,
-  LogOut,
-  User,
-  Settings,
-  Shield,
-  ChevronDown,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Moon, Sun, Menu, ShoppingCart, LogOut, User, Shield, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
+import { createClient } from "@/lib/supabase/client";
 
-interface NavbarProps {
-  onMenuClick?: () => void;
-}
+interface NavbarProps { onMenuClick?: () => void; }
 
 export function Navbar({ onMenuClick }: NavbarProps) {
-  const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
-  const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
+  const router = useRouter();
+  const [user, setUser] = useState<{ name?: string; email?: string; role?: string } | null>(null);
 
-  const initials = user?.name
-    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-    : "?";
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setUser({
+          name: (user.user_metadata?.name as string) ?? user.email,
+          email: user.email,
+          role: (user.app_metadata?.role as string) ?? "user",
+        });
+      }
+    });
+  }, []);
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
+
+  const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) ?? "?";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center gap-4 px-4 md:px-6">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
+      <div className="flex h-14 items-center gap-4 px-4 md:px-6">
         {onMenuClick && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={onMenuClick}
-          >
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick}>
             <Menu className="h-5 w-5" />
           </Button>
         )}
-
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-            C
+        <Link href="/" className="flex items-center gap-2 font-bold text-lg">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white text-sm font-bold">
+            {(process.env.NEXT_PUBLIC_APP_NAME ?? "C").charAt(0)}
           </div>
-          <span className="hidden sm:block">
-            {process.env.NEXT_PUBLIC_APP_NAME ?? "CloudCRM"}
-          </span>
+          <span className="hidden sm:block">{process.env.NEXT_PUBLIC_APP_NAME ?? "CloudCRM"}</span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-6 ml-6">
-          <Link
-            href="/"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Products
-          </Link>
-          {session && (
-            <>
-              <Link
-                href="/dashboard"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/services"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Services
-              </Link>
-              <Link
-                href="/invoices"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Invoices
-              </Link>
-              <Link
-                href="/tickets"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Support
-              </Link>
-            </>
-          )}
-        </nav>
-
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            aria-label="Toggle theme"
-          >
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        <div className="ml-auto flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
           </Button>
 
-          {session ? (
+          {user ? (
             <>
               <Button variant="ghost" size="icon" asChild>
-                <Link href="/cart" aria-label="Cart">
-                  <ShoppingCart className="h-5 w-5" />
-                </Link>
+                <Link href="/cart"><ShoppingCart className="h-4 w-4" /></Link>
               </Button>
-
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/dashboard" aria-label="Notifications">
-                  <Bell className="h-5 w-5" />
-                </Link>
-              </Button>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="flex items-center gap-2 h-auto py-1.5 px-2"
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                        {initials}
-                      </AvatarFallback>
+                  <Button variant="ghost" className="flex items-center gap-2 h-auto py-1.5 px-2">
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-semibold">{initials}</AvatarFallback>
                     </Avatar>
-                    <span className="hidden sm:block text-sm font-medium max-w-[120px] truncate">
-                      {user?.name ?? user?.email}
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <span className="hidden sm:block text-sm font-medium max-w-[100px] truncate">{user.name}</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{user?.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {user?.email}
-                      </p>
-                    </div>
+                    <p className="text-sm font-medium">{user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/account">
-                      <User className="mr-2 h-4 w-4" />
-                      Account Settings
-                    </Link>
+                    <Link href="/account"><User className="mr-2 h-4 w-4" />Account</Link>
                   </DropdownMenuItem>
-                  {user?.role === "admin" && (
+                  {user.role === "admin" && (
                     <DropdownMenuItem asChild>
-                      <Link href="/admin">
-                        <Shield className="mr-2 h-4 w-4" />
-                        Admin Panel
-                      </Link>
+                      <Link href="/admin"><Shield className="mr-2 h-4 w-4" />Admin Panel</Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={() => signOut({ callbackUrl: "/" })}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
+                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
           ) : (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" asChild>
-                <Link href="/login">Sign In</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/register">Get Started</Link>
-              </Button>
+              <Button variant="ghost" size="sm" asChild><Link href="/login">Sign In</Link></Button>
+              <Button size="sm" asChild><Link href="/register">Get Started</Link></Button>
             </div>
           )}
         </div>

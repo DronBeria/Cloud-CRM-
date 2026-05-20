@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { ShoppingCart, Loader2, ArrowRight, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,8 +38,7 @@ interface Cart {
 }
 
 export default function CartPage() {
-  const { data: session } = useSession();
-  const router = useRouter();
+    const router = useRouter();
   const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckingOut, setIsCheckingOut] = useState(false);

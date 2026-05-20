@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -42,7 +41,7 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
 
 export default function TicketDetailPage() {
   const params = useParams();
-  const { data: session } = useSession();
+  // session removed
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -133,7 +132,7 @@ export default function TicketDetailPage() {
       <div className="space-y-4">
         {ticket.messages.map((msg) => {
           const isStaff = msg.user.role?.name === "admin";
-          const isOwn = msg.user.id === session?.user?.id;
+          const isOwn = msg.user.id === null?.id;
 
           return (
             <div

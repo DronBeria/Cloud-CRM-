@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -33,9 +32,18 @@ type ProfileForm = z.infer<typeof profileSchema>;
 type PasswordForm = z.infer<typeof passwordSchema>;
 
 export default function AccountPage() {
-  const { data: session, update } = useSession();
-  const user = session?.user as { name?: string; email?: string; id?: string } | undefined;
+  const [user, setUser] = useState<{ name?: string; email?: string; id?: string } | null>(null);
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) ?? "?";
+
+  // Load user from Supabase
+  useEffect(() => {
+    import("@/lib/supabase/client").then(({ createClient }) => {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data: { user: u } }) => {
+        if (u) setUser({ name: (u.user_metadata?.name as string) ?? u.email, email: u.email, id: u.app_metadata?.prisma_id as string ?? u.id });
+      });
+    });
+  }, []);
 
   const [saving, setSaving] = useState(false);
   const [sessions, setSessions] = useState<any[]>([]);
@@ -77,7 +85,7 @@ export default function AccountPage() {
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error("Failed");
-      await update({ name: data.name });
+      setUser((u) => u ? { ...u, name: data.name } : u);
       toast.success("Profile updated");
     } catch { toast.error("Failed to update profile"); }
     finally { setSaving(false); }
