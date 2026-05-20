@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { processInvoicePaid } from "@/lib/billing";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     include: { items: true },
   });
 
-  if (!invoice || invoice.userId !== session.user.id) {
+  if (!invoice || invoice.userId !== currentUser!.id) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     db.invoiceTransaction.create({
       data: {
         invoiceId: invoice.id,
-        userId: session.user.id,
+        userId: currentUser!.id,
         amount: total,
         status: "succeeded",
         transactionId: razorpay_payment_id,

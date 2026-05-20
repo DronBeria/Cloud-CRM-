@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const [templates, prefs] = await Promise.all([
     db.notificationTemplate.findMany({ where: { enabled: true }, select: { key: true, name: true } }),
-    db.notificationPreference.findMany({ where: { userId: session.user.id } }),
+    db.notificationPreference.findMany({ where: { userId: currentUser!.id } }),
   ]);
 
   const prefsMap = Object.fromEntries(prefs.map((p) => [p.templateKey, p]));
@@ -24,15 +24,15 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const prefs: { key: string; emailEnabled: boolean; inAppEnabled: boolean }[] = await req.json();
 
   for (const pref of prefs) {
     await db.notificationPreference.upsert({
-      where: { userId_templateKey: { userId: session.user.id, templateKey: pref.key } },
-      create: { userId: session.user.id, templateKey: pref.key, emailEnabled: pref.emailEnabled, inAppEnabled: pref.inAppEnabled },
+      where: { userId_templateKey: { userId: currentUser!.id, templateKey: pref.key } },
+      create: { userId: currentUser!.id, templateKey: pref.key, emailEnabled: pref.emailEnabled, inAppEnabled: pref.inAppEnabled },
       update: { emailEnabled: pref.emailEnabled, inAppEnabled: pref.inAppEnabled },
     });
   }

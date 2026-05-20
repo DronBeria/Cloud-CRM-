@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { sendNotification } from "@/lib/notifications";
@@ -14,8 +14,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -24,7 +24,7 @@ export async function POST(
     include: { product: true, plan: true, cancellation: true },
   });
 
-  if (!service || service.userId !== session.user.id) {
+  if (!service || service.userId !== currentUser!.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -74,7 +74,7 @@ export async function POST(
   const typeLabel =
     body.type === "immediate" ? "immediately" : "at the end of the billing period";
 
-  sendNotification("service_cancellation_received", session.user.id, {
+  sendNotification("service_cancellation_received", currentUser!.id, {
     serviceName,
     cancellationType: typeLabel,
   }).catch(console.error);
@@ -88,9 +88,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const session = await auth();
-  const sessionUser = session?.user as { role?: string } | undefined;
-  if (!session || sessionUser?.role !== "admin") {
+  const currentUser = await getUser();
+  if (currentUser?.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

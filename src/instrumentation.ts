@@ -67,29 +67,29 @@ export async function register() {
       const { seedNotificationTemplates } = await import("@/lib/notifications");
       await seedNotificationTemplates();
 
-      // Create admin user if none exists
-      const adminExists = await db.user.findFirst({
-        where: { role: { name: "admin" } },
-      });
+      // Create admin user if none exists (Prisma + Supabase)
+      const adminExists = await db.user.findFirst({ where: { role: { name: "admin" } } });
 
       if (!adminExists) {
         const email = process.env.ADMIN_EMAIL ?? "admin@cloudcrm.app";
         const password = process.env.ADMIN_PASSWORD ?? "Admin123!";
-        const hashed = await bcrypt.default.hash(password, 12);
+        const hashed = await bcrypt.default.hash(password, 10);
 
-        await db.user.upsert({
+        const adminUser = await db.user.upsert({
           where: { email },
-          create: {
-            name: "Administrator",
-            email,
-            password: hashed,
-            roleId: adminRole.id,
-            emailVerifiedAt: new Date(),
-          },
+          create: { name: "Administrator", email, password: hashed, roleId: adminRole.id, emailVerifiedAt: new Date() },
           update: { roleId: adminRole.id },
         });
 
-        console.log(`[startup] Admin created: ${email}`);
+        // Create in Supabase Auth with admin role
+        try {
+          const { createAuthUser } = await import("@/lib/supabase/auth");
+          await createAuthUser({ email, password, name: "Administrator", role: "admin", prismaId: adminUser.id });
+          console.log(`[startup] Admin created in Supabase: ${email}`);
+        } catch (e) {
+          console.error("[startup] Supabase admin creation failed:", e);
+          console.log(`[startup] Admin Prisma user created: ${email} — run migration script to sync Supabase`);
+        }
       }
     } catch (err) {
       console.error("[startup] Seed error:", err);

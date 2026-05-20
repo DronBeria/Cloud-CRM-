@@ -1,8 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { isStaff } from "@/lib/permissions";
+import { getStaffSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { ArrowLeft, User, Server, FileText, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import {
@@ -53,8 +53,8 @@ export default async function InvoiceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const currentUser = await getUser();
+  if (!currentUser) redirect("/login");
 
   const invoice = await db.invoice.findUnique({
     where: { id },
@@ -69,7 +69,7 @@ export default async function InvoiceDetailPage({
     },
   });
 
-  if (!invoice || invoice.userId !== session.user.id) {
+  if (!invoice || invoice.userId !== currentUser!.id) {
     notFound();
   }
 

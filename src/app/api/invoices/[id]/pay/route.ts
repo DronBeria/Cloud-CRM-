@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { processInvoicePaid, applyCredits } from "@/lib/billing";
 
@@ -8,8 +8,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -18,7 +18,7 @@ export async function POST(
     include: { items: true, currency: true },
   });
 
-  if (!invoice || invoice.userId !== session.user.id) {
+  if (!invoice || invoice.userId !== currentUser!.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

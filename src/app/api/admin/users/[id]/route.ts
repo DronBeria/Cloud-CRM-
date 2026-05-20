@@ -59,7 +59,7 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const session = await getStaffSession();
-  const role = (session?.user as { role?: string } | undefined)?.role;
+  const role = (// removed: { role?: string } | undefined)?.role;
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // Only admins can delete users

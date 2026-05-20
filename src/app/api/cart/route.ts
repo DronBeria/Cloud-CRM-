@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 
 async function getOrCreateCart(userId: string) {
@@ -52,18 +52,18 @@ async function getOrCreateCart(userId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cart = await getOrCreateCart(session.user.id);
+  const cart = await getOrCreateCart(currentUser!.id);
   return NextResponse.json(cart);
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -87,11 +87,11 @@ export async function PATCH(req: NextRequest) {
     }
 
     await db.cart.update({
-      where: { userId: session.user.id },
+      where: { userId: currentUser!.id },
       data: { couponId: coupon.id },
     });
   }
 
-  const cart = await getOrCreateCart(session.user.id);
+  const cart = await getOrCreateCart(currentUser!.id);
   return NextResponse.json(cart);
 }

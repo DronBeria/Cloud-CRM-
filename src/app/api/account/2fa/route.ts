@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 
 // Generate 2FA secret + QR code
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { TOTP } = await import("otpauth");
     const QRCode = await import("qrcode");
 
     const user = await db.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: currentUser!.id },
       select: { email: true, twoFactorSecret: true },
     });
 
@@ -22,7 +22,7 @@ export async function GET() {
 
     const totp = new TOTP({
       issuer: process.env.NEXT_PUBLIC_APP_NAME ?? "CloudCRM",
-      label: user?.email ?? session.user.id,
+      label: user?.email ?? currentUser!.id,
       algorithm: "SHA1",
       digits: 6,
       period: 30,
@@ -40,8 +40,8 @@ export async function GET() {
 
 // Enable 2FA — verify token and save secret
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { secret, token } = await req.json();
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     );
 
     await db.user.update({
-      where: { id: session.user.id },
+      where: { id: currentUser!.id },
       data: {
         twoFactorSecret: secret,
         twoFactorRecoveryCodes: JSON.stringify(recoveryCodes),
@@ -76,11 +76,11 @@ export async function POST(req: NextRequest) {
 
 // Disable 2FA
 export async function DELETE() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   await db.user.update({
-    where: { id: session.user.id },
+    where: { id: currentUser!.id },
     data: { twoFactorSecret: null, twoFactorRecoveryCodes: null },
   });
 

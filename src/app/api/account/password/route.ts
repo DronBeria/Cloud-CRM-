@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -10,8 +10,8 @@ const schema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest) {
     const { currentPassword, newPassword } = schema.parse(await req.json());
 
     const user = await db.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: currentUser!.id },
     });
 
     if (!user || !user.password) {
@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest) {
 
     const hashed = await bcrypt.hash(newPassword, 10);
     await db.user.update({
-      where: { id: session.user.id },
+      where: { id: currentUser!.id },
       data: { password: hashed },
     });
 

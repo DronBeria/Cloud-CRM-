@@ -1,45 +1,55 @@
-import NextAuth from "next-auth";
-import { authConfig } from "@/lib/auth.config";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-
-/**
- * Middleware uses ONLY the edge-compatible authConfig — no Prisma, no bcrypt.
- * Runs on Vercel Edge Runtime: zero cold starts, globally distributed, ~1ms overhead.
- */
-const { auth } = NextAuth(authConfig);
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
 const STAFF_ROLES = ["admin", "manager"];
 
 const PUBLIC_PREFIXES = [
-  "/products", "/api/auth", "/api/webhooks", "/api/payment",
-  "/api/health", "/api/inngest", "/monitoring", "/_next", "/favicon",
+  "/api/auth", "/api/webhooks", "/api/payment", "/api/health",
+  "/api/inngest", "/monitoring", "/_next", "/favicon", "/products",
 ];
-const PUBLIC_EXACT = new Set(["/", "/login", "/register", "/forgot-password", "/admin/login", "/privacy", "/terms"]);
+const PUBLIC_EXACT = new Set([
+  "/", "/login", "/register", "/forgot-password",
+  "/admin/login", "/privacy", "/terms",
+]);
 
 function isPublic(pathname: string) {
-  return PUBLIC_EXACT.has(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+  return PUBLIC_EXACT.has(pathname) ||
+    PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
-export default auth((req: NextRequest & { auth: { user?: { role?: string; id?: string } } | null }) => {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff2?|ttf|map)$/)) return NextResponse.next();
-  if (isPublic(pathname)) return NextResponse.next();
+  if (pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff2?|ttf|map)$/)) {
+    return NextResponse.next();
+  }
 
-  const session = req.auth;
-  const role = session?.user?.role as string | undefined;
-  const userId = session?.user?.id as string | undefined;
+  let res = NextResponse.next({ request: req });
 
-  const injectHeaders = (res: NextResponse) => {
-    if (userId) res.headers.set("x-user-id", userId);
-    if (role) res.headers.set("x-user-role", role ?? "user");
-    return res;
-  };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return req.cookies.getAll(); },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
+          res = NextResponse.next({ request: req });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            res.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
 
-  // Admin routes
+  const { data: { user } } = await supabase.auth.getUser();
+  const role = (user?.app_metadata?.role as string) ?? null;
+
+  if (isPublic(pathname)) return res;
+
   if (pathname.startsWith("/admin")) {
-    if (!session) {
+    if (!user) {
       const url = new URL("/admin/login", req.url);
       url.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(url);
@@ -47,11 +57,13 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; id?: s
     if (!STAFF_ROLES.includes(role ?? "")) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
-    return injectHeaders(NextResponse.next());
+    res.headers.set("x-user-id", (user.app_metadata?.prisma_id as string) ?? user.id);
+    res.headers.set("x-user-role", role ?? "user");
+    res.headers.set("x-user-email", user.email ?? "");
+    return res;
   }
 
-  // Client routes
-  if (!session) {
+  if (!user) {
     const url = new URL("/login", req.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
@@ -61,8 +73,10 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; id?: s
     return NextResponse.redirect(new URL("/admin", req.url));
   }
 
-  return injectHeaders(NextResponse.next());
-});
+  res.headers.set("x-user-id", (user.app_metadata?.prisma_id as string) ?? user.id);
+  res.headers.set("x-user-role", role ?? "user");
+  return res;
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],

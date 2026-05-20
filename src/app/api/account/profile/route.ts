@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 
@@ -17,31 +17,31 @@ const schema = z.object({
 });
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const user = await db.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: currentUser!.id },
     select: { id: true, name: true, email: true, phone: true, companyName: true, gstin: true, address: true, city: true, state: true, country: true, postcode: true },
   });
   return NextResponse.json(user);
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const data = schema.parse(await req.json());
 
     const existing = await db.user.findFirst({
-      where: { email: data.email, NOT: { id: session.user.id } },
+      where: { email: data.email, NOT: { id: currentUser!.id } },
       select: { id: true },
     });
     if (existing) return NextResponse.json({ error: "Email already in use" }, { status: 409 });
 
     const user = await db.user.update({
-      where: { id: session.user.id },
+      where: { id: currentUser!.id },
       data,
       select: { id: true, name: true, email: true },
     });

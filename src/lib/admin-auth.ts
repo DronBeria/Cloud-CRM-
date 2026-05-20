@@ -1,36 +1,42 @@
-import { auth } from "@/lib/auth";
-import { isStaff, isAdmin, type AdminOnlyPermission, canDo } from "@/lib/permissions";
+import { createClient } from "@/lib/supabase/server";
+import { canDo, type AdminOnlyPermission } from "@/lib/permissions";
 
-// Used in API routes — reads full session from JWT
-export async function getStaffSession() {
-  const session = await auth();
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  if (!session || !isStaff(role)) return null;
-  return session as typeof session & { user: { id: string; role: string; name: string; email: string } };
+export type StaffSession = {
+  id: string;
+  supabaseId: string;
+  email: string;
+  name: string;
+  role: string;
+  user: { id: string; role: string; name?: string; email?: string };
+};
+
+async function getSupabaseUser() {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return null;
+    return user;
+  } catch { return null; }
 }
 
-export async function getAdminSession() {
-  const session = await auth();
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  if (!session || !isAdmin(role)) return null;
-  return session as typeof session & { user: { id: string; role: string } };
+export async function getStaffSession(): Promise<StaffSession | null> {
+  const user = await getSupabaseUser();
+  if (!user) return null;
+  const role = (user.app_metadata?.role as string) ?? "user";
+  if (!["admin", "manager"].includes(role)) return null;
+  const id = (user.app_metadata?.prisma_id as string) ?? user.id;
+  const name = (user.user_metadata?.name as string) ?? user.email ?? "";
+  return { id, supabaseId: user.id, email: user.email ?? "", name, role, user: { id, role, name, email: user.email } };
 }
 
-export async function requireStaff() {
+export async function getAdminSession(): Promise<StaffSession | null> {
   const session = await getStaffSession();
-  if (!session) throw new Error("Forbidden");
-  return session;
-}
-
-export async function requireAdmin() {
-  const session = await getAdminSession();
-  if (!session) throw new Error("Forbidden");
+  if (!session || session.role !== "admin") return null;
   return session;
 }
 
 export async function checkPermission(permission: AdminOnlyPermission): Promise<boolean> {
   const session = await getStaffSession();
   if (!session) return false;
-  const role = (session.user as { role?: string }).role;
-  return canDo(role, permission);
+  return canDo(session.role, permission);
 }

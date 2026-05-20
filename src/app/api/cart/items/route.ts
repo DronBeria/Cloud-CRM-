@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 
@@ -9,8 +9,8 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get or create cart
-    let cart = await db.cart.findUnique({ where: { userId: session.user.id } });
+    let cart = await db.cart.findUnique({ where: { userId: currentUser!.id } });
     if (!cart) {
       await db.currency.upsert({
         where: { code: "USD" },
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         update: {},
       });
       cart = await db.cart.create({
-        data: { userId: session.user.id, currencyCode: "USD" },
+        data: { userId: currentUser!.id, currencyCode: "USD" },
       });
     }
 

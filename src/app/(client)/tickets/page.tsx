@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { MessageSquare, Plus } from "lucide-react";
 import { TicketCard } from "@/components/tickets/TicketCard";
@@ -12,11 +12,11 @@ export const revalidate = 60;
 export const metadata: Metadata = { title: "Support Tickets" };
 
 export default async function TicketsPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const currentUser = await getUser();
+  if (!currentUser) redirect("/login");
 
   const tickets = await db.ticket.findMany({
-    where: { userId: session.user.id },
+    where: { userId: currentUser!.id },
     include: { _count: { select: { messages: true } } },
     orderBy: { updatedAt: "desc" },
   });

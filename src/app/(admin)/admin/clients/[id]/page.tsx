@@ -1,8 +1,7 @@
 import { Metadata } from "next";
-import { auth } from "@/lib/auth";
+import { getStaffSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
-import { isStaff } from "@/lib/permissions";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import {

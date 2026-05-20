@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { generateInvoicePdf } from "@/lib/pdf";
 
@@ -8,8 +8,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -26,8 +26,8 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const sessionUser = session.user as { role?: string };
-  if (invoice.userId !== session.user.id && sessionUser.role !== "admin") {
+  const userRole = currentUser?.role ?? "user";
+  if (invoice.userId !== currentUser!.id && userRole !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

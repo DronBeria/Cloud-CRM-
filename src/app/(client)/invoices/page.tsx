@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { FileText } from "lucide-react";
@@ -15,11 +15,11 @@ export const metadata: Metadata = {
 };
 
 export default async function InvoicesPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const currentUser = await getUser();
+  if (!currentUser) redirect("/login");
 
   const invoices = await db.invoice.findMany({
-    where: { userId: session.user.id },
+    where: { userId: currentUser!.id },
     include: {
       currency: true,
       items: true,

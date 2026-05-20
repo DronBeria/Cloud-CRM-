@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import crypto from "crypto";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const keys = await db.apiKey.findMany({
-    where: { userId: session.user.id },
+    where: { userId: currentUser!.id },
     orderBy: { createdAt: "desc" },
     select: { id: true, name: true, lastUsedAt: true, createdAt: true },
   });
@@ -18,12 +18,12 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { name } = z.object({ name: z.string().min(1).max(50) }).parse(await req.json());
 
-  const count = await db.apiKey.count({ where: { userId: session.user.id } });
+  const count = await db.apiKey.count({ where: { userId: currentUser!.id } });
   if (count >= 5) {
     return NextResponse.json({ error: "Maximum 5 API keys allowed" }, { status: 400 });
   }
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   const key = `ccrm_${crypto.randomBytes(24).toString("hex")}`;
 
   const apiKey = await db.apiKey.create({
-    data: { userId: session.user.id, name, key },
+    data: { userId: currentUser!.id, name, key },
   });
 
   // Return full key only on creation — never shown again
@@ -39,10 +39,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await req.json();
-  await db.apiKey.deleteMany({ where: { id, userId: session.user.id } });
+  await db.apiKey.deleteMany({ where: { id, userId: currentUser!.id } });
   return NextResponse.json({ success: true });
 }

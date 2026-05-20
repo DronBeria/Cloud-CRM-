@@ -1,9 +1,8 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { getStaffSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { isStaff } from "@/lib/permissions";
 import { formatDate } from "@/lib/utils";
 import { Users, Search, UserPlus, ArrowRight, Phone, Mail, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -32,9 +31,8 @@ export default async function AdminClientsPage({
 }: {
   searchParams: Promise<{ page?: string; search?: string; tab?: string }>;
 }) {
-  const session = await auth();
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  if (!session || !isStaff(role)) redirect("/admin/login");
+  const staffUser = await getStaffSession();
+  if (!staffUser) redirect("/admin/login");
 
   const { page = "1", search = "", tab = "clients" } = await searchParams;
   const pageSize = 20;

@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { sanitize, sanitizeShort } from "@/lib/sanitize";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sessionUser = session.user as { role?: string };
+  const userRole = currentUser?.role ?? "user";
   const where =
-    sessionUser.role === "admin" ? {} : { userId: session.user.id };
+    userRole === "admin" ? {} : { userId: currentUser!.id };
 
   const tickets = await db.ticket.findMany({
     where,
@@ -33,8 +33,8 @@ const createSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -46,13 +46,13 @@ export async function POST(req: NextRequest) {
 
     const ticket = await db.ticket.create({
       data: {
-        userId: session.user.id,
+        userId: currentUser!.id,
         subject,
         priority,
         status: "open",
         messages: {
           create: {
-            userId: session.user.id,
+            userId: currentUser!.id,
             message,
           },
         },

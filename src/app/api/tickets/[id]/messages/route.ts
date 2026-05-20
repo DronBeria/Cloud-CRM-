@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { sanitize } from "@/lib/sanitize";
@@ -11,8 +11,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -21,8 +21,8 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const sessionUser = session.user as { role?: string };
-  if (ticket.userId !== session.user.id && sessionUser.role !== "admin") {
+  const userRole = currentUser?.role ?? "user";
+  if (ticket.userId !== currentUser!.id && userRole !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -38,14 +38,14 @@ export async function POST(
     const message = sanitize(body.message, 10000);
     if (!message) return NextResponse.json({ error: "Message cannot be empty" }, { status: 400 });
 
-    const isAdmin = sessionUser.role === "admin";
+    const isAdmin = userRole === "admin";
     const newStatus = isAdmin ? "replied" : "open";
 
     const [ticketMessage] = await db.$transaction([
       db.ticketMessage.create({
         data: {
           ticketId: id,
-          userId: session.user.id,
+          userId: currentUser!.id,
           message,
         },
         include: {

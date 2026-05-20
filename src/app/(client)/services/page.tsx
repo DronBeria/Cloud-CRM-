@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { Server, Plus } from "lucide-react";
 import { ServiceCard } from "@/components/services/ServiceCard";
@@ -15,11 +15,11 @@ export const metadata: Metadata = {
 };
 
 export default async function ServicesPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const currentUser = await getUser();
+  if (!currentUser) redirect("/login");
 
   const services = await db.service.findMany({
-    where: { userId: session.user.id },
+    where: { userId: currentUser!.id },
     include: {
       product: true,
       plan: true,

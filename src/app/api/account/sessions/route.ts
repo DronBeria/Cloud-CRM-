@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const sessions = await db.userSession.findMany({
-    where: { userId: session.user.id },
+    where: { userId: currentUser!.id },
     orderBy: { createdAt: "desc" },
     take: 20,
   });
@@ -16,16 +16,16 @@ export async function GET() {
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { sessionId } = await req.json();
 
   if (sessionId === "all") {
-    await db.userSession.deleteMany({ where: { userId: session.user.id } });
+    await db.userSession.deleteMany({ where: { userId: currentUser!.id } });
   } else {
     await db.userSession.deleteMany({
-      where: { id: sessionId, userId: session.user.id },
+      where: { id: sessionId, userId: currentUser!.id },
     });
   }
 

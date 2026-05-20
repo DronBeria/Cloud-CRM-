@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 
 export async function DELETE(
@@ -7,8 +7,8 @@ export async function DELETE(
   { params }: { params: Promise<{ itemId: string }> }
 ) {
   const { itemId } = await params;
-  const session = await auth();
-  if (!session?.user?.id) {
+  const currentUser = await getUser();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -17,7 +17,7 @@ export async function DELETE(
     include: { cart: true },
   });
 
-  if (!item || item.cart.userId !== session.user.id) {
+  if (!item || item.cart.userId !== currentUser!.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

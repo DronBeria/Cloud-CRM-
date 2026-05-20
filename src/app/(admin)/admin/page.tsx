@@ -1,7 +1,6 @@
 import { Metadata } from "next";
-import { auth } from "@/lib/auth";
+import { getStaffSession } from "@/lib/admin-auth";
 import { redirect } from "next/navigation";
-import { isStaff } from "@/lib/permissions";
 import { db } from "@/lib/db";
 
 export const revalidate = 30;
@@ -34,9 +33,8 @@ function getGreeting() {
 }
 
 export default async function AdminDashboardPage() {
-  const session = await auth();
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  if (!session || !isStaff(role)) redirect("/admin/login");
+  const staffUser = await getStaffSession();
+  if (!staffUser) redirect("/admin/login");
 
   const inrRate = await getInrRate();
   const now = new Date();

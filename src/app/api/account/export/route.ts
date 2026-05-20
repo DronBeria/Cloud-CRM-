@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 // GDPR Article 20 — Right to data portability
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const currentUser = await getUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userId = session.user.id;
+  const userId = currentUser!.id;
 
   const [user, invoices, services, tickets, credits, sessions, apiKeys] = await Promise.all([
     db.user.findUnique({

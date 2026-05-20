@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { format, formatDistanceToNow } from "date-fns";
@@ -29,10 +29,10 @@ const STATUS_DOT: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const currentUser = await getUser();
+  if (!currentUser) redirect("/login");
 
-  const userId = session.user.id;
+  const userId = currentUser!.id;
   const inrRate = await getInrRate();
 
   const [services, invoices, tickets, credits] = await Promise.all([
@@ -64,7 +64,7 @@ export default async function DashboardPage() {
 
   const activeServices = services.filter((s) => s.status === "active");
   const creditBalance = credits.reduce((s, c) => s + Number(c.amount), 0);
-  const firstName = session.user.name?.split(" ")[0] ?? "there";
+  const firstName = currentUser.name?.split(" ")[0] ?? "there";
 
   return (
     <div className="space-y-6">

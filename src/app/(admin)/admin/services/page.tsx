@@ -1,6 +1,5 @@
 import { Metadata } from "next";
-import { auth } from "@/lib/auth";
-import { isStaff } from "@/lib/permissions";
+import { getStaffSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Server } from "lucide-react";

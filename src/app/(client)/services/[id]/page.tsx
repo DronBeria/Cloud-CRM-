@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getUser } from "@/lib/supabase/auth";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { ArrowLeft, Server, Calendar, Tag, AlertTriangle, ArrowUpCircle } from "lucide-react";
@@ -26,8 +26,8 @@ export default async function ServiceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const currentUser = await getUser();
+  if (!currentUser) redirect("/login");
 
   const service = await db.service.findUnique({
     where: { id },
@@ -47,7 +47,7 @@ export default async function ServiceDetailPage({
     },
   });
 
-  if (!service || service.userId !== session.user.id) notFound();
+  if (!service || service.userId !== currentUser!.id) notFound();
 
   const price = service.plan?.prices.find(
     (p) => p.currency.code === service.currencyCode
