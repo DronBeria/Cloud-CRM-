@@ -25,30 +25,34 @@ type Form = z.infer<typeof schema>;
 export default function RegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-
   const { register, handleSubmit, formState: { errors } } = useForm<Form>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (data: Form) => {
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: { name: data.name },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) { toast.error(error.message); return; }
-
-      // Also create Prisma user record via API
-      await fetch("/api/auth/register", {
+      // Use server API — creates both Prisma + Supabase user via admin client
+      // Admin client sets email_confirm: true so NO confirmation email is sent
+      const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: data.name, email: data.email, password: data.password }),
       });
+
+      const result = await res.json();
+      if (!res.ok) { toast.error(result.error ?? "Registration failed."); return; }
+
+      // Sign in immediately — account is already confirmed
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (error) {
+        toast.success("Account created! Please sign in.");
+        router.push("/login");
+        return;
+      }
 
       toast.success("Welcome aboard!");
       router.push("/dashboard");
@@ -63,7 +67,7 @@ export default function RegisterPage() {
   return (
     <>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Create your account</h1>
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Create your account</h1>
         <p className="text-sm text-gray-500 mt-1">Get started — it&apos;s free</p>
       </div>
 
@@ -84,7 +88,9 @@ export default function RegisterPage() {
           {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
           <div className="flex gap-4 mt-1">
             {["8+ chars", "Uppercase", "Number"].map((r) => (
-              <span key={r} className="flex items-center gap-1 text-xs text-gray-400"><Check className="h-3 w-3" />{r}</span>
+              <span key={r} className="flex items-center gap-1 text-xs text-gray-400">
+                <Check className="h-3 w-3" />{r}
+              </span>
             ))}
           </div>
         </div>
