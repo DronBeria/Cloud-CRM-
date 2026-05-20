@@ -8,6 +8,15 @@ const registerSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
+  // Optional profile fields from step 2
+  phone: z.string().optional(),
+  companyName: z.string().optional(),
+  gstin: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  country: z.string().optional(),
+  // Optional plan from step 3
+  selectedPlanId: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -19,9 +28,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, email, password } = registerSchema.parse(body);
+    const { name, email, password, phone, companyName, gstin, city, state, country, selectedPlanId } = registerSchema.parse(body);
 
-    // Run existence check + role lookup in parallel
     const [existing, role] = await Promise.all([
       db.user.findUnique({ where: { email }, select: { id: true } }),
       db.role.findFirst({ where: { name: "user" }, select: { id: true } }),
@@ -31,19 +39,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
 
-    // Hash + create user in parallel
     const [hashedPassword, roleId] = await Promise.all([
       bcrypt.hash(password, 10),
-      role ? Promise.resolve(role.id) : db.role.create({ data: { name: "user", permissions: [] } }).then(r => r.id),
+      role ? Promise.resolve(role.id) : db.role.create({ data: { name: "user", permissions: [] } }).then((r) => r.id),
     ]);
 
     const user = await db.user.create({
-      data: { name, email, password: hashedPassword, roleId, emailVerifiedAt: new Date() },
+      data: {
+        name, email, password: hashedPassword, roleId,
+        emailVerifiedAt: new Date(),
+        phone: phone || undefined,
+        companyName: companyName || undefined,
+        gstin: gstin || undefined,
+        city: city || undefined,
+        state: state || undefined,
+        country: country || undefined,
+      },
       select: { id: true, email: true, name: true },
     });
 
-    // Create Supabase auth user — fire and forget (don't block response)
-    // getUser() will auto-create the link on first login anyway
+    // Add selected plan to cart (fire-and-forget)
+    if (selectedPlanId) {
+      const currency = await db.currency.findFirst({ where: { enabled: true }, select: { code: true } });
+      if (currency) {
+        db.cart.upsert({
+          where: { userId: user.id },
+          create: { userId: user.id, currencyCode: currency.code },
+          update: {},
+        }).then(async (cart) => {
+          await db.cartItem.create({ data: { cartId: cart.id, planId: selectedPlanId } });
+        }).catch(console.error);
+      }
+    }
+
+    // Create Supabase auth user — fire and forget
     import("@/lib/supabase/auth").then(({ createAuthUser }) =>
       createAuthUser({ email, password, name, role: "user", prismaId: user.id })
     ).catch(console.error);
