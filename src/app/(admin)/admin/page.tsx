@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { isStaff } from "@/lib/permissions";
 import { db } from "@/lib/db";
+
+export const revalidate = 30;
 import { subDays, subMonths, startOfMonth, format } from "date-fns";
 import Link from "next/link";
 import {

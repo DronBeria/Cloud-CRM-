@@ -7,6 +7,8 @@ import { MessageSquare, Plus } from "lucide-react";
 import { TicketCard } from "@/components/tickets/TicketCard";
 import { Button } from "@/components/ui/button";
 
+export const revalidate = 60;
+
 export const metadata: Metadata = { title: "Support Tickets" };
 
 export default async function TicketsPage() {

@@ -31,28 +31,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!credentials?.email || !credentials?.password) return null;
 
         try {
-          // Minimal select — only fetch what we need
           const user = await db.user.findUnique({
             where: { email: credentials.email as string },
             select: {
-              id: true,
-              email: true,
-              name: true,
-              password: true,
-              roleId: true,
-              role: { select: { name: true } },
+              id: true, email: true, name: true, password: true,
+              roleId: true, role: { select: { name: true } },
             },
           });
 
           if (!user?.password) {
-            db.auditLog.create({ data: { action: "login_failed", entity: "auth", entityId: credentials.email as string } }).catch(() => {});
+            db.auditLog.create({
+              data: { action: "login_failed", entity: "auth", entityId: credentials.email as string },
+            }).catch(() => {});
             return null;
           }
 
           const isValid = await bcrypt.compare(credentials.password as string, user.password);
 
           if (!isValid) {
-            db.auditLog.create({ data: { userId: user.id, action: "login_failed", entity: "auth", entityId: user.id } }).catch(() => {});
+            db.auditLog.create({
+              data: { userId: user.id, action: "login_failed", entity: "auth", entityId: user.id },
+            }).catch(() => {});
             return null;
           }
 
@@ -92,32 +91,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       try {
         const role = await db.role.findFirst({ where: { name: "user" }, select: { id: true } });
         if (role && user.id) {
-          await db.user.update({ where: { id: user.id }, data: { roleId: role.id }, select: { id: true } });
+          await db.user.update({
+            where: { id: user.id },
+            data: { roleId: role.id },
+            select: { id: true },
+          });
         }
       } catch { /* Non-fatal */ }
     },
-    async signIn({ user, account }) {
+    async signIn({ user }) {
+      // Fire-and-forget session log — never blocks login
       if (!user?.id) return;
-      try {
-        // Record login session — keep last 20 per user
-        await db.userSession.create({
-          data: {
-            userId: user.id,
-            token: `login_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-            lastActiveAt: new Date(),
-          },
-        });
-        // Clean up old sessions (keep 20)
-        const sessions = await db.userSession.findMany({
-          where: { userId: user.id },
-          orderBy: { createdAt: "desc" },
-          skip: 20,
-          select: { id: true },
-        });
-        if (sessions.length > 0) {
-          await db.userSession.deleteMany({ where: { id: { in: sessions.map((s) => s.id) } } });
-        }
-      } catch { /* Non-fatal */ }
+      db.userSession.create({
+        data: {
+          userId: user.id,
+          token: `s_${Date.now()}`,
+          lastActiveAt: new Date(),
+        },
+      }).catch(() => {});
     },
   },
 });

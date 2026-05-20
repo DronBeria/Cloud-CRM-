@@ -8,6 +8,8 @@ import { ServiceCard } from "@/components/services/ServiceCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: "Services",
 };

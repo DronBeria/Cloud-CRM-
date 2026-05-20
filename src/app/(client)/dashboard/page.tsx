@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Dashboard" };
+export const revalidate = 60; // cache for 60 seconds — reduces cold-start DB hits
 
 async function getInrRate() {
   try {

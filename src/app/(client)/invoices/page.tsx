@@ -8,6 +8,8 @@ import { InvoiceCard } from "@/components/invoices/InvoiceCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: "Invoices",
 };
