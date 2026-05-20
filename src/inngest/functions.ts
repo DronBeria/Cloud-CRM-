@@ -6,37 +6,33 @@ import { sendNotification } from "@/lib/notifications";
 import { suspendService as tsplusSuspend, isTsplusProduct, isConfigured as tsplusConfigured } from "@/lib/tsplus";
 import { subDays } from "date-fns";
 
-// Daily billing cron — replaces the manual /api/cron/billing endpoint
+// Inngest v4 API: triggers go inside the first argument object
 export const dailyBilling = inngest.createFunction(
   {
     id: "daily-billing",
     name: "Daily Billing & Renewals",
     retries: 3,
+    triggers: [{ cron: "0 0 * * *" }],
   },
-  { cron: "0 0 * * *" }, // midnight UTC daily
-  async ({ step }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async ({ step }: { step: any }) => {
     const billing = await getBillingSettings();
     const now = new Date();
 
-    // Step 1: Suspend overdue services
     const suspended = await step.run("suspend-overdue", async () => {
       const suspendCutoff = subDays(now, billing.suspendDays);
       const overdueInvoices = await db.invoice.findMany({
         where: { status: "pending", dueAt: { lt: suspendCutoff } },
         include: { orders: { include: { services: { where: { status: "active" } } } } },
       });
-
       let count = 0;
       for (const invoice of overdueInvoices) {
         for (const order of invoice.orders) {
           for (const service of order.services) {
-            await db.service.update({
-              where: { id: service.id },
-              data: { status: "suspended", suspendedAt: now },
-            });
+            await db.service.update({ where: { id: service.id }, data: { status: "suspended", suspendedAt: now } });
             if (tsplusConfigured()) {
               try {
-                const product = await db.product.findUnique({ where: { id: service.productId } });
+                const product = await db.product.findUnique({ where: { id: service.productId }, select: { slug: true } });
                 if (product && isTsplusProduct(product.slug)) await tsplusSuspend(service.id);
               } catch { /* non-fatal */ }
             }
@@ -51,7 +47,6 @@ export const dailyBilling = inngest.createFunction(
       return { suspended: count };
     });
 
-    // Step 2: Cancel long-suspended services
     const cancelled = await step.run("cancel-terminated", async () => {
       const terminateCutoff = subDays(now, billing.terminateDays);
       const longSuspended = await db.service.findMany({
@@ -63,14 +58,12 @@ export const dailyBilling = inngest.createFunction(
       return { cancelled: longSuspended.length };
     });
 
-    // Step 3: Generate renewal invoices
     const renewals = await step.run("generate-renewals", async () => {
       const renewalCutoff = subDays(now, -billing.renewalDays);
       const expiring = await db.service.findMany({
         where: { status: "active", expiresAt: { gte: now, lte: renewalCutoff }, planId: { not: null } },
         include: { plan: { include: { prices: true } }, product: true },
       });
-
       let count = 0;
       for (const s of expiring) {
         if (!s.plan || s.plan.isOneTime) continue;
@@ -80,14 +73,10 @@ export const dailyBilling = inngest.createFunction(
         if (existing) continue;
         const price = s.plan.prices.find((p) => p.currencyCode === s.currencyCode);
         if (!price) continue;
-
         const dueAt = s.expiresAt ?? subDays(now, -7);
         const invoice = await db.invoice.create({
           data: {
-            userId: s.userId,
-            currencyCode: s.currencyCode,
-            status: "pending",
-            dueAt,
+            userId: s.userId, currencyCode: s.currencyCode, status: "pending", dueAt,
             items: { create: { description: `${s.product.name} — ${s.plan.name} Renewal`, price: price.price, quantity: 1, serviceId: s.id } },
           },
         });
@@ -105,7 +94,6 @@ export const dailyBilling = inngest.createFunction(
       return { renewals: count };
     });
 
-    // Step 4: Auto-close stale tickets
     const closed = await step.run("close-stale-tickets", async () => {
       const staleCutoff = subDays(now, 7);
       const result = await db.ticket.updateMany({
@@ -119,11 +107,15 @@ export const dailyBilling = inngest.createFunction(
   }
 );
 
-// Triggered when an invoice is paid — provision services
 export const onInvoicePaid = inngest.createFunction(
-  { id: "on-invoice-paid", name: "Handle Invoice Paid", retries: 3 },
-  { event: "invoice/paid" },
-  async ({ event, step }) => {
+  {
+    id: "on-invoice-paid",
+    name: "Handle Invoice Paid",
+    retries: 3,
+    triggers: [{ event: "invoice/paid" }],
+  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async ({ event, step }: { event: any; step: any }) => {
     const { invoiceId } = event.data as { invoiceId: string };
     const { processInvoicePaid } = await import("@/lib/billing");
     await step.run("process-payment", () => processInvoicePaid(invoiceId));
