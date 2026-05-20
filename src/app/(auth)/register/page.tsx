@@ -114,10 +114,10 @@ export default function RegisterPage() {
         password: step1Data.password,
       });
 
-      if (error) { toast.success("Account created! Please sign in."); router.push("/login"); return; }
+      if (error) { toast.success("Account created! Please sign in."); window.location.href = "/login"; return; }
 
       toast.success("Welcome to CloudCRM! 🎉");
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } catch {
       toast.error("Something went wrong.");
     } finally {

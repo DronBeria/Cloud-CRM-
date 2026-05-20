@@ -45,7 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex-1 flex flex-col">
           <div className="h-14 bg-white border-b border-gray-100" />
           <div className="flex-1 flex items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
           </div>
         </div>
       </div>

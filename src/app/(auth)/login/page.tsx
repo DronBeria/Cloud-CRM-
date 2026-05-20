@@ -45,9 +45,8 @@ function LoginForm() {
         return;
       }
 
-      // Don't call router.refresh() — it triggers a cold-start server re-render (adds 2-4s)
-      // Supabase sets cookies automatically; the next page will have the session
-      router.push(callbackUrl);
+      // Hard redirect ensures cookies are sent with the middleware request
+      window.location.href = callbackUrl;
     } catch {
       toast.error("Something went wrong.");
     } finally {
