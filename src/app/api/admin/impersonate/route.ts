@@ -19,13 +19,13 @@ export async function POST(req: NextRequest) {
 
   if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-  const adminRole = (session.user as { role?: string }).role;
-  if (adminRole === target.role?.name) {
+  // Prevent impersonating another admin
+  if (target.role?.name === "admin" || target.role?.name === "manager") {
     return NextResponse.json({ error: "Cannot impersonate another admin" }, { status: 400 });
   }
 
   await audit({
-    userId: (session.user as { id: string }).id,
+    userId: session.id,
     action: "impersonate_start",
     entity: "user",
     entityId: userId,
@@ -48,7 +48,7 @@ export async function DELETE() {
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await audit({
-    userId: (session.user as { id: string }).id,
+    userId: session.id,
     action: "impersonate_end",
     entity: "user",
   });

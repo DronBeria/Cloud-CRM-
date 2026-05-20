@@ -26,9 +26,9 @@ export default async function AdminInvoicesPage({
 }: {
   searchParams: Promise<{ page?: string; status?: string }>;
 }) {
-  const session = await auth();
-  const sessionUser = session?.user as { role?: string } | undefined;
-  if (!session || !isStaff(sessionUser?.role)) redirect("/admin/login");
+    const sessionUser = null;
+  const staffUser = await getStaffSession();
+  if (!staffUser) redirect("/admin/login");
 
   const { page = "1", status = "" } = await searchParams;
   const pageSize = 20;

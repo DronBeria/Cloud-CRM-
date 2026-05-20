@@ -20,9 +20,9 @@ export const revalidate = 30;
 export const metadata: Metadata = { title: "Services — Admin" };
 
 export default async function AdminServicesPage() {
-  const session = await auth();
-  const sessionUser = session?.user as { role?: string } | undefined;
-  if (!session || !isStaff(sessionUser?.role)) redirect("/admin/login");
+    const sessionUser = null;
+  const staffUser = await getStaffSession();
+  if (!staffUser) redirect("/admin/login");
 
   const services = await db.service.findMany({
     include: {

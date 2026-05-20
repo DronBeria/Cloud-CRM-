@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!note?.trim()) return NextResponse.json({ error: "Note is required" }, { status: 400 });
 
   const created = await db.clientNote.create({
-    data: { clientId: id, staffId: staffId ?? (session.user as { id: string }).id, note },
+    data: { clientId: id, staffId: staffId ?? session.id, note },
   });
   return NextResponse.json(created, { status: 201 });
 }

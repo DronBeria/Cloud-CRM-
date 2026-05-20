@@ -39,9 +39,8 @@ export default async function ClientDetailPage({
   params,
 }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await auth();
-  const sessionUser = session?.user as { role?: string; id?: string } | undefined;
-  if (!session || !isStaff(sessionUser?.role)) redirect("/admin/login");
+      const staffUser = await getStaffSession();
+  if (!staffUser) redirect("/admin/login");
 
   const inrRate = await getInrRate();
 
@@ -259,7 +258,7 @@ export default async function ClientDetailPage({
         services={servicesData}
         tickets={ticketsData}
         notes={notesData}
-        staffId={sessionUser?.id ?? ""}
+        staffId={staffUser?.id ?? ""}
         creditBalance={creditBalance}
       />
     </div>
