@@ -1,5 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/lib/auth";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+const STAFF_ROLES = ["admin", "manager"];
 
 const PUBLIC_PATHS = [
   "/login",
@@ -16,41 +19,25 @@ const PUBLIC_PATHS = [
   "/terms",
 ];
 
-const STAFF_ROLES = ["admin", "manager"];
-
-// Simple in-memory rate limiter (per edge instance)
-const RL = new Map<string, { n: number; t: number }>();
-function rateCheck(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  const e = RL.get(key);
-  if (!e || e.t < now) { RL.set(key, { n: 1, t: now + windowMs }); return true; }
-  if (e.n >= limit) return false;
-  e.n++;
-  return true;
-}
-
-function isPublic(p: string) {
-  return p === "/" ||
-    p.startsWith("/products") ||
-    PUBLIC_PATHS.some((pp) => p === pp || p.startsWith(pp + "/"));
+function isPublic(pathname: string) {
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/products") ||
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  );
 }
 
 const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
-  "X-XSS-Protection": "1; mode=block",
   "Referrer-Policy": "strict-origin-when-cross-origin",
 };
 
-function addHeaders(res: NextResponse): NextResponse {
-  Object.entries(SECURITY_HEADERS).forEach(([k, v]) => res.headers.set(k, v));
-  return res;
-}
-
-export async function middleware(req: NextRequest) {
+// Use NextAuth v5's own auth() as middleware — reads the correct authjs cookie
+export default auth((req) => {
   const { pathname } = req.nextUrl;
 
-  // Skip static assets fast path
+  // Skip static files
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
@@ -59,27 +46,26 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Rate limit API routes
-  if (pathname.startsWith("/api/")) {
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "anon";
-    if (!rateCheck(`api:${ip}`, 200, 60_000)) {
-      return new NextResponse("Too many requests", {
-        status: 429,
-        headers: { "Retry-After": "60", "Content-Type": "text/plain" },
-      });
+  const session = req.auth;
+  const role = (session?.user as { role?: string } | undefined)?.role;
+
+  const addHeaders = (res: NextResponse) => {
+    Object.entries(SECURITY_HEADERS).forEach(([k, v]) => res.headers.set(k, v));
+    // Pass user info to server components via headers (avoids double JWT decode)
+    if (session?.user) {
+      res.headers.set("x-user-id", session.user.id ?? "");
+      res.headers.set("x-user-role", role ?? "user");
     }
-  }
+    return res;
+  };
 
   if (isPublic(pathname)) {
     return addHeaders(NextResponse.next());
   }
 
-  // Decode JWT — getToken is local (no DB call) when strategy=jwt
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET }).catch(() => null);
-  const role = token?.role as string | undefined;
-
+  // Admin routes
   if (pathname.startsWith("/admin")) {
-    if (!token) {
+    if (!session) {
       const url = new URL("/admin/login", req.url);
       url.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(url);
@@ -91,7 +77,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Client routes
-  if (!token) {
+  if (!session) {
     const url = new URL("/login", req.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
@@ -102,7 +88,7 @@ export async function middleware(req: NextRequest) {
   }
 
   return addHeaders(NextResponse.next());
-}
+});
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
