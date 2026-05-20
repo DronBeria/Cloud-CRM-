@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ClientNavbar } from "@/components/layout/ClientNavbar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -12,20 +12,33 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<{ name?: string; email?: string } | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { router.replace("/login"); return; }
-      setUser({ name: (user.user_metadata?.name as string) ?? user.email, email: user.email });
+    // getSession() reads from memory/localStorage — no network call, instant
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) { router.replace("/login"); return; }
+      setUser({
+        name: (session.user.user_metadata?.name as string) ?? session.user.email,
+        email: session.user.email,
+      });
       setReady(true);
     });
   }, [router]);
 
+  useEffect(() => { setSidebarOpen(false); }, [pathname]);
+
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+      <div className="min-h-screen flex bg-gray-50">
+        <div className="hidden md:flex w-56 bg-white border-r border-gray-100 shrink-0" />
+        <div className="flex-1 flex flex-col">
+          <div className="h-14 bg-white border-b border-gray-100" />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+          </div>
+        </div>
       </div>
     );
   }
