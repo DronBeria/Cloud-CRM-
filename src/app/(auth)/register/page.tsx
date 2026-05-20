@@ -100,7 +100,8 @@ export default function RegisterPage() {
           city: step2Data?.city,
           state: step2Data?.state,
           country: step2Data?.country,
-          selectedPlanId: selectedPlan,
+          selectedPlanId: selectedPlan !== "__trial__" ? selectedPlan : undefined,
+          claimTrial: selectedPlan === "__trial__",
         }),
       });
 
@@ -255,6 +256,35 @@ export default function RegisterPage() {
       {/* Step 3 — Plan selection */}
       {step === 3 && (
         <div className="space-y-4">
+          {/* Free trial CTA */}
+          <button
+            type="button"
+            onClick={() => { setSelectedPlan("__trial__"); }}
+            className={cn(
+              "w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all",
+              selectedPlan === "__trial__"
+                ? "border-indigo-600 bg-indigo-50"
+                : "border-dashed border-indigo-300 hover:border-indigo-400 bg-gradient-to-r from-indigo-50 to-violet-50"
+            )}
+          >
+            <div className={cn("flex h-5 w-5 items-center justify-center rounded-full border-2 shrink-0",
+              selectedPlan === "__trial__" ? "border-indigo-600 bg-indigo-600" : "border-indigo-400"
+            )}>
+              {selectedPlan === "__trial__" && <Check className="h-3 w-3 text-white" />}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-indigo-700">🎁 Start with a FREE 7-day trial</p>
+              <p className="text-xs text-indigo-500 mt-0.5">Full access to our cloud services — no credit card required</p>
+            </div>
+            <span className="text-xs font-bold text-white bg-indigo-600 px-2.5 py-1 rounded-lg shrink-0">FREE</span>
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400">or choose a plan</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
           {loadingPlans ? (
             <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
           ) : plans.length === 0 ? (

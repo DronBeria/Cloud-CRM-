@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { QuickPayButton } from "@/components/client/QuickPayButton";
 import { QuickTicketButton } from "@/components/client/QuickTicketButton";
+import { FreeTrialBanner } from "@/components/client/FreeTrialBanner";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -98,6 +99,9 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Free trial banner — shown when eligible */}
+      <FreeTrialBanner />
 
       {/* Overdue alert */}
       {totalDue > 0 && (

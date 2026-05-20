@@ -36,6 +36,8 @@ const SETTING_GROUPS = {
     { key: "tax_type", label: "Tax Type (inclusive/exclusive)", type: "text", placeholder: "exclusive" },
     { key: "credits_enabled", label: "Enable Credits System", type: "toggle" },
     { key: "credits_auto_apply", label: "Auto-Apply Credits to Invoices", type: "toggle" },
+    { key: "trial_plan_id", label: "Free Trial Plan ID", type: "text", placeholder: "Plan ID from Products page" },
+    { key: "trial_duration_days", label: "Free Trial Duration (days)", type: "number", placeholder: "7" },
   ],
   mail: [
     { key: "mail_enabled", label: "Enable Email Sending", type: "toggle" },

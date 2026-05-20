@@ -52,6 +52,8 @@ export async function register() {
         registration_enabled: "true",
         default_currency: "INR",
         inr_exchange_rate: "83.5",
+        trial_duration_days: "7",
+        trial_plan_id: "",
       };
 
       for (const [key, value] of Object.entries(defaultSettings)) {

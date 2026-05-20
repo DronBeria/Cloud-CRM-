@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cache } from "react";
 
 export type AppUser = {
   id: string;
@@ -9,8 +10,9 @@ export type AppUser = {
   role: string;
 };
 
-/** Get current authenticated user. Auto-creates Prisma user on first login. */
-export async function getUser(): Promise<AppUser | null> {
+/** Get current authenticated user. Auto-creates Prisma user on first login.
+ *  Wrapped with React cache() — only one Supabase call per server render cycle. */
+export const getUser = cache(async (): Promise<AppUser | null> => {
   try {
     const supabase = await createClient();
     const { data: { user }, error } = await supabase.auth.getUser();
@@ -54,7 +56,7 @@ export async function getUser(): Promise<AppUser | null> {
 
     return { id: prismaId, supabaseId: user.id, email: user.email ?? "", name, role };
   } catch { return null; }
-}
+});
 
 /** Set role in Supabase app_metadata */
 export async function setUserRole(supabaseId: string, role: string, prismaId?: string) {

@@ -37,6 +37,7 @@ model User {
   phone                  String?
   companyName            String?
   gstin                  String?
+  trialClaimedAt         DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
@@ -298,6 +299,7 @@ model Service {
   product          Product           @relation(fields: [productId], references: [id])
   plan             Plan?             @relation(fields: [planId], references: [id])
   currency         Currency          @relation(fields: [currencyCode], references: [code])
+  isTrial            Boolean  @default(false)
   billingAgreement BillingAgreement? @relation(fields: [billingAgreementId], references: [id])
   cancellation     ServiceCancellation?
   upgrades         ServiceUpgrade[]

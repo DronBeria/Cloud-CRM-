@@ -17,6 +17,7 @@ const registerSchema = z.object({
   country: z.string().optional(),
   // Optional plan from step 3
   selectedPlanId: z.string().optional(),
+  claimTrial: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, email, password, phone, companyName, gstin, city, state, country, selectedPlanId } = registerSchema.parse(body);
+    const { name, email, password, phone, companyName, gstin, city, state, country, selectedPlanId, claimTrial } = registerSchema.parse(body);
 
     const [existing, role] = await Promise.all([
       db.user.findUnique({ where: { email }, select: { id: true } }),
@@ -70,6 +71,32 @@ export async function POST(req: NextRequest) {
           await db.cartItem.create({ data: { cartId: cart.id, planId: selectedPlanId } });
         }).catch(console.error);
       }
+    }
+
+    // Activate trial if requested (fire-and-forget — use the trial API logic)
+    if (claimTrial) {
+      import("@/lib/settings").then(async ({ getSetting }) => {
+        const trialPlanId = await getSetting("trial_plan_id");
+        if (!trialPlanId) return;
+        const [plan, currency] = await Promise.all([
+          db.plan.findUnique({ where: { id: trialPlanId }, include: { product: true } }),
+          db.currency.findFirst({ where: { enabled: true } }),
+        ]);
+        if (!plan || !currency) return;
+        const days = parseInt(await getSetting("trial_duration_days") ?? "7");
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + days);
+        await db.$transaction([
+          db.service.create({
+            data: {
+              userId: user.id, productId: plan.productId, planId: plan.id,
+              currencyCode: currency.code, status: "active", price: 0,
+              isTrial: true, expiresAt, label: `${plan.product.name} — Free Trial`,
+            },
+          }),
+          db.user.update({ where: { id: user.id }, data: { trialClaimedAt: new Date() } }),
+        ]);
+      }).catch(console.error);
     }
 
     // Create Supabase auth user — fire and forget
